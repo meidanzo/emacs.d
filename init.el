@@ -187,3 +187,26 @@
 ;;; no-byte-compile: t
 ;;; End:
 (put 'erase-buffer 'disabled nil)
+
+
+;;org文件快速添加代码快
+(require 'org-tempo)
+(add-hook 'c-mode-common-hook 'google-set-c-style)
+(add-hook 'c-mode-common-hook 'google-make-newline-indent)
+
+;;多个缓冲区进行gdb，代码在文章最后:http://tuhdo.github.io/c-ide.html
+(setq
+ gdb-many-windows t  ;; use gdb-many-windows by default
+ gdb-show-main t  ;; Non-nil means display source file containing the main routine at startup
+)
+
+;; 解决中英文混排的时候折行错误
+(global-visual-line-mode 1)
+(setq word-wrap-by-category t)
+
+;; 放弃自动备份文件
+;(setq make-backup-files nil)
+
+;; 启动自动开启 xclip-mode
+(require 'xclip)
+(xclip-mode 1)
