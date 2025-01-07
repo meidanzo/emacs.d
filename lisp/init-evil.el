@@ -899,7 +899,14 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
                  my-default-color))))
     (set-face-background 'mode-line (car color))
     (set-face-foreground 'mode-line (cdr color))))
-(add-hook 'post-command-hook #'my-show-evil-state)
+(add-hook 'evil-emacs-state-entry-hook #'my-show-evil-state)
+(add-hook 'evil-insert-state-entry-hook #'my-show-evil-state)
+(add-hook 'evil-motion-state-entry-hook #'my-show-evil-state)
+(add-hook 'evil-normal-state-entry-hook #'my-show-evil-state)
+(add-hook 'evil-visual-state-entry-hook #'my-show-evil-state)
+(add-hook 'evil-replace-state-entry-hook #'my-show-evil-state)
+(add-hook 'evil-operator-state-entry-hook #'my-show-evil-state)
+(add-hook 'window-selection-change-functions #'my-show-evil-state)
 ;; }}
 
 ;; {{ evil-nerd-commenter
