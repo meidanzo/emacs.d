@@ -34,6 +34,9 @@
       (push '(?j . ("JSON.stringify(" . ")")) evil-surround-pairs-alist)
       (push '(?> . ("(e) => " . "(e)")) evil-surround-pairs-alist))
 
+    (when (memq major-mode '(c++-mode))
+      (push '(?< . ("< " . " >")) evil-surround-pairs-alist))
+
     ;; generic
     (push '(?/ . ("/" . "/")) evil-surround-pairs-alist))
   (add-hook 'prog-mode-hook 'evil-surround-prog-mode-hook-setup))
@@ -281,9 +284,10 @@ COUNT, BEG, END, TYPE is used.  If INCLUSIVE is t, the text object is inclusive.
 ;; }}
 
 ;; {{ https://github.com/syl20bnr/evil-escape
-(setq-default evil-escape-delay 0.3)
+(setq-default evil-escape-delay 0.09)
 (setq evil-escape-excluded-major-modes '(dired-mode))
 (setq-default evil-escape-key-sequence "kj")
+(setq evil-escape-unordered-key-sequence t) ;; 允许倒序触发
 ;; disable evil-escape when input method is on
 (evil-escape-mode 1)
 ;; }}
@@ -790,6 +794,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "ir" 'ivy-resume
   "ww" 'my-narrow-or-widen-dwim
   "wf" 'popup-which-function)
+
 ;; }}
 
 ;; {{ Use `SPC` as leader key
@@ -1050,6 +1055,29 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   (my-org-leader-def
     "f" 'my-navigate-in-pdf
     "g" 'my-open-pdf-goto-page))
+
+(with-eval-after-load 'tex
+  (general-create-definer my-tex-comma-leader-def
+    :prefix ","
+    :states '(normal visual visual-line visual-block)
+    :keymaps 'TeX-mode-map)
+
+  (my-tex-comma-leader-def
+    "cm" 'TeX-command-master
+    "ca" 'TeX-command-run-all
+    "cn" 'my-TeX-view-with-SyncTeX-highlighting
+    "ch" 'my-TeX-view-with-SyncTeX-highlighting
+    "ce" 'LaTeX-environment
+    "ck" 'auctex-cont-latexmk-toggle
+    "cd" 'TeX-view
+    "c[" 'cdlatex-environment
+
+    ;; 兼容部分 vimTeX 命令
+    "lv" 'TeX-command-run-all
+    "lk" 'TeX-kill-job
+    "le" 'TeX-recenter-output-buffer
+    "lt" 'reftex-toc
+    "lc" 'TeX-clean))
 ;; }}
 
 
@@ -1101,4 +1129,99 @@ I'm not sure this is good idea.")
     (apply orig-func args)))
 (advice-add 'evil-visual-update-x-selection :around #'my-evil-visual-update-x-selection-hack)
 
+(with-eval-after-load 'evil
+
+  (general-create-definer my-easymotion-leader-def
+    :prefix ";"
+    :states '(normal visual visual-line visual-block)
+    :keymaps '(override))
+
+  (my-easymotion-leader-def
+    "fw" #'evilem-motion-forward-word-begin
+    "fW" #'evilem-motion-forward-WORD-begin
+    "e" #'evilem-motion-forward-word-end
+    "E" #'evilem-motion-forward-WORD-end
+    "b" #'evilem-motion-backward-word-begin
+    "B" #'evilem-motion-backward-WORD-begin
+    "ge" #'evilem-motion-backward-word-end
+    "gE" #'evilem-motion-backward-WORD-end
+    "j" #'evilem-motion-next-line
+    "k" #'evilem-motion-previous-line
+    "gj" #'evilem-motion-next-visual-line
+    "gk" #'evilem-motion-previous-visual-line
+    "t" #'evilem-motion-find-char-to
+    "T" #'evilem-motion-find-char-to-backward
+    "ff" #'evilem-motion-find-char
+    "fF" #'evilem-motion-find-char-backward
+    "[[" #'evilem-motion-backward-section-begin
+    "[]" #'evilem-motion-backward-section-end
+    "]]" #'evilem-motion-forward-section-begin
+    "][" #'evilem-motion-forward-section-end
+    "(" #'evilem-motion-backward-sentence-begin
+    ")" #'evilem-motion-forward-sentence-begin
+    "n" #'evilem-motion-search-next
+    "N" #'evilem-motion-search-previous
+    "*" #'evilem-motion-search-word-forward
+    "#" #'evilem-motion-search-word-backward
+    "-" #'evilem-motion-previous-line-first-non-blank
+    "+" #'evilem-motion-next-line-first-non-blank))
+
+(with-eval-after-load 'evil
+  (add-hook 'magit-mode-hook 'turn-off-evil-snipe-override-mode)
+
+  ;; 只启用基础 snipe
+  ;; (evil-snipe-mode +1)
+  (evil-snipe-override-mode +1)
+
+  (setq evil-snipe-scope 'whole-buffer)
+
+  ;; 自动滚动窗口跟随光标
+  (setq evil-snipe-auto-scroll t)
+
+  ;; 将 <[> 映射为任意左括号
+  ;; (push '(?\[ "[[{(]") evil-snipe-aliases)
+
+  ;; 明确禁止 override
+  ;; (evil-snipe-override-mode -1)
+
+  ;; (evil-define-key '(normal motion) evil-snipe-local-mode-map
+  ;;   "s" 'evil-snipe-s
+  ;;   "S" 'evil-snipe-S)
+
+  ;; 没起作用, 正好不会覆盖其他配置
+  (evil-define-key 'operator evil-snipe-local-mode-map
+    "z" 'evil-snipe-s
+    "Z" 'evil-snipe-S
+    "x" 'evil-snipe-x
+    "X" 'evil-snipe-X)
+
+  (evil-define-key 'motion evil-snipe-override-local-mode-map
+    "f" 'evil-snipe-f
+    "F" 'evil-snipe-F
+    "t" 'evil-snipe-t
+    "T" 'evil-snipe-T)
+
+  (when evil-snipe-override-evil-repeat-keys
+    (evil-define-key 'motion map
+      ";" 'evil-snipe-repeat
+      "," 'evil-snipe-repeat-reverse)))
+
+(with-eval-after-load 'evil
+  (my-ensure 'evil-surround)
+  (global-evil-surround-mode 1))
+
+(with-eval-after-load 'evil-surround
+  (my-ensure 'evil-embrace)
+  ;; 为特定 mode 注入 embrace 的自定义 pair
+  (add-hook 'org-mode-hook #'embrace-org-mode-hook)
+  (add-hook 'LaTeX-mode-hook #'embrace-LaTeX-mode-hook)
+  (add-hook 'ruby-mode-hook #'embrace-ruby-mode-hook)
+  (add-hook 'enh-ruby-mode-hook #'embrace-ruby-mode-hook)
+  ;; 指定哪些 key 仍交给 evil-surround（buffer-local）
+  ;; (add-hook 'LaTeX-mode-hook
+  ;;           (lambda ()
+  ;;             (add-to-list 'evil-embrace-evil-surround-keys ?o)))
+  (evil-embrace-enable-evil-surround-integration))
+
 (provide 'init-evil)
+;;; init-evil.el ends here

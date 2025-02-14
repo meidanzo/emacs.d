@@ -7,19 +7,21 @@
 ;;                           (other . "linux")))
 
 ;; Tip 2: Search my article "C/C++/Java code indentation in Emacs"
-;; My code might be obsolete, but the knowledge is still valid.kk
+;; My code might be obsolete, but the knowledge is still valid.
 ;;
 ;; C code example:
 ;;   if(1) // press ENTER here, zero means no indentation
 ;;   void fn() // press ENTER here, zero means no indentation
+(require 'google-c-style)
 
 (defun my-common-cc-mode-setup ()
   "Setup shared by all languages (java/groovy/c++ ...)."
   ;; give me NO newline automatically after electric expressions are entered
+  ;;默认设置:https://blog.csdn.net/nuaa_meteor/article/details/76653271
   (setq c-auto-newline nil)
 
   ;make DEL take all previous whitespace with it
-  (c-toggle-hungry-state 1))
+  (c-toggle-auto-hungry-state 1))
 
 (defun my-c-mode-setup ()
   "C/C++ only setup."
@@ -42,6 +44,10 @@
   "C/C++ setup."
   (unless (my-buffer-file-temp-p)
     (my-common-cc-mode-setup)
+    ;; google-style设置
+    (google-set-c-style)
+    (google-make-newline-indent)
+    (setq c-basic-offset 4)
     (unless (or (derived-mode-p 'java-mode) (derived-mode-p 'groovy-mode))
       (my-c-mode-setup))))
 (add-hook 'c-mode-common-hook 'c-mode-common-hook-setup)
