@@ -43,7 +43,7 @@
   (if current-input-method (message "IME on!")))
 (advice-add 'evil-insert-state :around #'my-evil-insert-state-hack)
 
-(global-set-key (kbd "C-\\") 'my-toggle-input-method)
+;; (global-set-key (kbd "C-\\") 'my-toggle-input-method)
 ;; }}
 
 ;; {{ pyim
@@ -70,7 +70,7 @@ See pyim-wbdict's website for the full list of enable functions.")
   ;; (define-key pyim-mode-map "," 'pyim-page-previous-page)
 
   ;; press "/" to turn off pyim
-  (define-key pyim-mode-map (kbd "/") 'my-pyim-clear-and-off)
+  ;; (define-key pyim-mode-map (kbd "/") 'my-pyim-clear-and-off)
 
   ;; use western punctuation
   (setq pyim-punctuation-dict nil)

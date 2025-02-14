@@ -89,6 +89,8 @@
     ;; counsel
     ;; swiper
     ;; }}
+    bibtex-completion
+    ivy-bibtex
     wgrep
     tablist ; required by pdf-tools
     pdf-tools ; @see https://github.com/vedang/pdf-tools/issues/102
@@ -120,7 +122,20 @@
     zoutline
     company-c-headers
     graphql-mode
-    company-statistics)
+    company-statistics
+    google-c-style
+    auctex
+    auctex-cont-latexmk
+    auctex-label-numbers
+    cdlatex
+    amsreftex
+    evil-tex
+    evil-snipe
+    evil-easymotion
+    posframe
+    rime
+    grip-mode
+    ox-gfm)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -217,6 +232,14 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 ;; Fire up package.el and ensure the following packages are installed.
 ;;------------------------------------------------------------------------------
 
+;; {{ Fixed expiring GNU ELPA keys
+;; GNU ELPA GPG key will expire on Sep-2019. So we need install this package to
+;; update key or else users can't install packages from GNU ELPA.
+;; @see https://www.reddit.com/r/emacs/comments/bn6k1y/updating_gnu_elpa_keys/
+;; BTW, this setup uses MELPA only. So GNU ELPA GPG key is not used.
+;; 这个包放在最前面, 放置验证失败报错
+(require-package 'gnu-elpa-keyring-update)
+;; }}
 (require-package 'compat)
 (require-package 'async)
 ; color-theme 6.6.1 in elpa is buggy
@@ -251,6 +274,8 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'git-timemachine)
 (require-package 'exec-path-from-shell)
 (require-package 'ivy)
+(require-package 'bibtex-completion)
+(require-package 'ivy-bibtex)
 (require-package 'swiper)
 (require-package 'counsel) ; counsel => swiper => ivy
 (require-package 'find-file-in-project)
@@ -331,14 +356,22 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'pyim-wbdict) ; someone may use wubi IME, not me
 (require-package 'pyim-basedict)
 (require-package 'esup)
+(require-package 'google-c-style)
+(require-package 'auctex)
+(require-package 'auctex-cont-latexmk)
+(require-package 'auctex-label-numbers)
+(require-package 'cdlatex)
+(require-package 'amsreftex)
+(require-package 'evil-embrace)  ;; 必须和evil-surround保持一致, 要么都是 MELPA-Stable 要么都是 MELPA
+(require-package 'evil-tex)
+(require-package 'preview-auto)
+(require-package 'evil-snipe)
+(require-package 'evil-easymotion)
+(require-package 'posframe)
+(require-package 'rime)
+(require-package 'grip-mode)
+(require-package 'ox-gfm)
 
-;; {{ Fixed expiring GNU ELPA keys
-;; GNU ELPA GPG key will expire on Sep-2019. So we need install this package to
-;; update key or else users can't install packages from GNU ELPA.
-;; @see https://www.reddit.com/r/emacs/comments/bn6k1y/updating_gnu_elpa_keys/
-;; BTW, this setup uses MELPA only. So GNU ELPA GPG key is not used.
-(require-package 'gnu-elpa-keyring-update)
-;; }}
 
 ;; org => ppt
 (require-package 'org-re-reveal)
