@@ -281,7 +281,7 @@ COUNT, BEG, END, TYPE is used.  If INCLUSIVE is t, the text object is inclusive.
 ;; }}
 
 ;; {{ https://github.com/syl20bnr/evil-escape
-(setq-default evil-escape-delay 0.3)
+(setq-default evil-escape-delay 0.09)
 (setq evil-escape-excluded-major-modes '(dired-mode))
 (setq-default evil-escape-key-sequence "kj")
 ;; disable evil-escape when input method is on
@@ -846,7 +846,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   ;;    (set-face-attribute 'avy-lead-face-0 nil :foreground "black")
   ;;    (set-face-attribute 'avy-lead-face-0 nil :background "#f86bf3"))
   ";" 'ace-pinyin-jump-char-2
-  "w" 'mybigword-big-words-in-current-window
+  "mw" 'mybigword-big-words-in-current-window
   "s" 'avy-goto-word-or-subword-1
   "a" 'avy-goto-char-timer
   "db" 'my-dict-complete-definition ; details
@@ -889,9 +889,9 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
                 ((minibufferp)
                  my-default-color)
                 (current-input-method
-                 '("#e80074" . "#ffffff"))
+                 '("#a3be8c" . "#3b4252"))
                 ((evil-insert-state-p)
-                 '("#e80000" . "#ffffff"))
+                 '("#d08770" . "#ffffff"))
                 ((evil-emacs-state-p)
                  '("#444488" . "#ffffff"))
                 ((buffer-modified-p)
@@ -1050,6 +1050,30 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   (my-org-leader-def
     "f" 'my-navigate-in-pdf
     "g" 'my-open-pdf-goto-page))
+
+(with-eval-after-load 'tex
+  (general-create-definer my-tex-comma-leader-def
+    :prefix ","
+    :states '(normal visual visual-line visual-block)
+    :keymaps 'TeX-mode-map)
+
+  (my-tex-comma-leader-def
+    "cm" 'TeX-command-master
+    "ca" 'TeX-command-run-all
+    "cn" 'my-TeX-view-with-SyncTeX-highlighting
+    "ch" 'my-TeX-view-with-SyncTeX-highlighting
+    "ce" 'LaTeX-environment
+    "ck" 'auctex-cont-latexmk-toggle
+    "cd" 'TeX-view
+    "c[" 'cdlatex-environment
+    "c=" 'reftex-toc
+
+    ;; 兼容部分 vimTeX 命令
+    "lv" 'TeX-command-run-all
+    "lk" 'TeX-kill-job
+    "le" 'TeX-recenter-output-buffer
+    "lt" 'reftex-toc
+    "lc" 'TeX-clean))
 ;; }}
 
 
@@ -1101,4 +1125,99 @@ I'm not sure this is good idea.")
     (apply orig-func args)))
 (advice-add 'evil-visual-update-x-selection :around #'my-evil-visual-update-x-selection-hack)
 
+(with-eval-after-load 'evil
+
+  (general-create-definer my-easymotion-leader-def
+    :prefix ";"
+    :states '(normal visual visual-line visual-block)
+    :keymaps '(override))
+
+  (my-easymotion-leader-def
+    "w" #'evilem-motion-forward-word-begin
+    "W" #'evilem-motion-forward-WORD-begin
+    "e" #'evilem-motion-forward-word-end
+    "E" #'evilem-motion-forward-WORD-end
+    "b" #'evilem-motion-backward-word-begin
+    "B" #'evilem-motion-backward-WORD-begin
+    "ge" #'evilem-motion-backward-word-end
+    "gE" #'evilem-motion-backward-WORD-end
+    "j" #'evilem-motion-next-line
+    "k" #'evilem-motion-previous-line
+    "gj" #'evilem-motion-next-visual-line
+    "gk" #'evilem-motion-previous-visual-line
+    "t" #'evilem-motion-find-char-to
+    "T" #'evilem-motion-find-char-to-backward
+    "f" #'evilem-motion-find-char
+    "F" #'evilem-motion-find-char-backward
+    "[[" #'evilem-motion-backward-section-begin
+    "[]" #'evilem-motion-backward-section-end
+    "]]" #'evilem-motion-forward-section-begin
+    "][" #'evilem-motion-forward-section-end
+    "(" #'evilem-motion-backward-sentence-begin
+    ")" #'evilem-motion-forward-sentence-begin
+    "n" #'evilem-motion-search-next
+    "N" #'evilem-motion-search-previous
+    "*" #'evilem-motion-search-word-forward
+    "#" #'evilem-motion-search-word-backward
+    "-" #'evilem-motion-previous-line-first-non-blank
+    "+" #'evilem-motion-next-line-first-non-blank))
+
+(with-eval-after-load 'evil
+  (add-hook 'magit-mode-hook 'turn-off-evil-snipe-override-mode)
+
+  ;; 只启用基础 snipe
+  ;; (evil-snipe-mode +1)
+  (evil-snipe-override-mode +1)
+
+  (setq evil-snipe-scope 'whole-buffer)
+
+  ;; 自动滚动窗口跟随光标
+  (setq evil-snipe-auto-scroll t)
+
+  ;; 将 <[> 映射为任意左括号
+  ;; (push '(?\[ "[[{(]") evil-snipe-aliases)
+
+  ;; 明确禁止 override
+  ;; (evil-snipe-override-mode -1)
+
+  ;; (evil-define-key '(normal motion) evil-snipe-local-mode-map
+  ;;   "s" 'evil-snipe-s
+  ;;   "S" 'evil-snipe-S)
+
+  ;; 没起作用, 正好不会覆盖其他配置
+  (evil-define-key 'operator evil-snipe-local-mode-map
+    "z" 'evil-snipe-s
+    "Z" 'evil-snipe-S
+    "x" 'evil-snipe-x
+    "X" 'evil-snipe-X)
+
+  (evil-define-key 'motion evil-snipe-override-local-mode-map
+    "f" 'evil-snipe-f
+    "F" 'evil-snipe-F
+    "t" 'evil-snipe-t
+    "T" 'evil-snipe-T)
+
+  (when evil-snipe-override-evil-repeat-keys
+    (evil-define-key 'motion map
+      ";" 'evil-snipe-repeat
+      "," 'evil-snipe-repeat-reverse)))
+
+(with-eval-after-load 'evil
+  (my-ensure 'evil-surround)
+  (global-evil-surround-mode 1))
+
+(with-eval-after-load 'evil-surround
+  (my-ensure 'evil-embrace)
+  ;; 为特定 mode 注入 embrace 的自定义 pair
+  (add-hook 'org-mode-hook #'embrace-org-mode-hook)
+  (add-hook 'LaTeX-mode-hook #'embrace-LaTeX-mode-hook)
+  (add-hook 'ruby-mode-hook #'embrace-ruby-mode-hook)
+  (add-hook 'enh-ruby-mode-hook #'embrace-ruby-mode-hook)
+  ;; 指定哪些 key 仍交给 evil-surround（buffer-local）
+  ;; (add-hook 'LaTeX-mode-hook
+  ;;           (lambda ()
+  ;;             (add-to-list 'evil-embrace-evil-surround-keys ?o)))
+  (evil-embrace-enable-evil-surround-integration))
+
 (provide 'init-evil)
+;;; init-evil.el ends here

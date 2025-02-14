@@ -42,6 +42,11 @@
                    (*linux* nil)
                    (t nil)))
 
+;; --- 自动 UTF-8 编码 ---
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(setq-default buffer-file-coding-system 'utf-8-unix)
+
 (defconst my-emacs-d (file-name-as-directory user-emacs-directory)
   "Directory of emacs.d.")
 
@@ -97,6 +102,7 @@
   (require-init 'init-ibuffer t)
   (require-init 'init-bookmark)
   (require-init 'init-ivy)
+  (require-init 'init-ivy-bibtex)
   (require-init 'init-windows)
   (require-init 'init-javascript t)
   (require-init 'init-org t)
@@ -114,7 +120,7 @@
   (require-init 'init-term-mode)
   (require-init 'init-web-mode t)
   (require-init 'init-company t)
-  (require-init 'init-chinese t) ;; cannot be idle-required
+  ;; (require-init 'init-chinese t) ;; cannot be idle-required
   ;; need statistics of keyfreq asap
   (require-init 'init-keyfreq t)
   (require-init 'init-httpd t)
@@ -142,6 +148,11 @@
   ;; use evil mode (vi key binding)
   (require-init 'init-evil) ; init-evil dependent on init-clipboard
   (require-init 'init-pdf)
+  (require-init 'init-LaTeX-mode)
+  (require-init 'init-org2latex)
+  (require-init 'init-preview) ; 用于 org-mode markdown 文件预览
+  (require-init 'init-rime-ui)
+  (require-init 'init-rime) ;; init-rime需要使用 site-lisp 中的 im-cursor-chg
 
   ;; ediff configuration should be last so it can override
   ;; the key bindings in previous configuration
@@ -187,3 +198,19 @@
 ;;; no-byte-compile: t
 ;;; End:
 (put 'erase-buffer 'disabled nil)
+
+;; 解决中英文混排的时候折行错误
+(global-visual-line-mode 1)
+(setq word-wrap-by-category t)
+
+;; 放弃自动备份文件
+;(setq make-backup-files nil)
+
+;; 启动自动开启 xclip-mode
+(require 'xclip)
+(xclip-mode 1)
+
+(require 'rime)
+
+(turnon-keyfreq-mode)
+;;; init.el ends here

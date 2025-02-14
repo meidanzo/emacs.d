@@ -441,6 +441,9 @@ _SPC_ cancel _o_nly this     _d_elete
          (setq this-command 'winner-undo)))
   ("Z" winner-redo)
   ("SPC" nil))
+
+;; 1. 确保按键在 key-translation-map 中正确映射（防止终端误解析）
+(define-key key-translation-map (kbd "C-c C-<right>") (kbd "C-c C-w"))
 (global-set-key (kbd "C-c C-w") 'my-hydra-window/body)
 ;; }}
 

@@ -260,7 +260,10 @@ If N is 2, list files in my recent 20 commits."
   ;; https://oremacs.com/2017/11/30/ivy-0.10.0/
   (setq ivy-use-selectable-prompt t)
 
-  (setq ivy-re-builders-alist '((t . my-re-builder-extended-pattern)))
+  ;; (setq ivy-re-builders-alist '((t . my-re-builder-extended-pattern)))
+  (setf (alist-get t ivy-re-builders-alist)
+        #'my-re-builder-extended-pattern)
+
   ;; set actions when running C-x b
   ;; replace "frame" with window to open in new window
   (ivy-set-actions

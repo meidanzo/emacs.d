@@ -797,5 +797,18 @@ This function is written in pure Lisp and slow."
     (when item
       (car (split-string item "|" t)))))
 
+(defun my-dir-check-p (dir &optional check-writable)
+  "检查 DIR 是否为有效且可访问的目录.
+如果 CHECK-WRITABLE 为非 nil, 则额外检查是否可写.
+返回 t 表示通过, nil 表示不通过."
+  (when (stringp dir)
+    (let ((full-path (expand-file-name dir)))
+      (and (file-directory-p full-path)
+           (file-accessible-directory-p full-path)
+           (file-readable-p full-path)
+           (or (not check-writable)
+               (file-writable-p full-path))
+           t)))) ;; 显式返回 t
+
 (provide 'init-utils)
 ;;; init-utils.el ends here
