@@ -120,7 +120,13 @@
     zoutline
     company-c-headers
     graphql-mode
-    company-statistics)
+    company-statistics
+    google-c-style
+    auctex
+    auctex-cont-latexmk
+    auctex-label-numbers
+    cdlatex
+    amsreftex)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -331,6 +337,12 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'pyim-wbdict) ; someone may use wubi IME, not me
 (require-package 'pyim-basedict)
 (require-package 'esup)
+(require-package 'google-c-style)
+(require-package 'auctex)
+(require-package 'auctex-cont-latexmk)
+(require-package 'auctex-label-numbers)
+(require-package 'cdlatex)
+(require-package 'amsreftex)
 
 ;; {{ Fixed expiring GNU ELPA keys
 ;; GNU ELPA GPG key will expire on Sep-2019. So we need install this package to

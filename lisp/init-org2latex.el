@@ -1,0 +1,57 @@
+;; ================= ort-mode to LaTeX ======================
+;; 让org-mode中文文件可以转换成正确的LaTeX文件并通过编译
+(with-eval-after-load 'ox-latex
+  ;; 注册 ctexart 类
+  (add-to-list 'org-latex-classes
+               '("ctexart"
+                 "\\documentclass[11pt]{ctexart}
+[DEFAULT-PACKAGES]
+[PACKAGES]
+[EXTRA]"
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+
+  ;; 注册 ctexrep 类
+  (add-to-list 'org-latex-classes
+               '("ctexrep"
+                 "\\documentclass[11pt]{ctexrep}
+[DEFAULT-PACKAGES]
+[PACKAGES]
+[EXTRA]"
+                 ("\\part{%s}" . "\\part*{%s}")
+                 ("\\chapter{%s}" . "\\chapter*{%s}")
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
+
+  ;; 注册 ctexbook 类
+  (add-to-list 'org-latex-classes
+               '("ctexbook"
+                 "\\documentclass[11pt]{ctexbook}
+[DEFAULT-PACKAGES]
+[PACKAGES]
+[EXTRA]"
+                 ("\\part{%s}" . "\\part*{%s}")
+                 ("\\chapter{%s}" . "\\chapter*{%s}")
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
+
+  ;; 设置全局默认导出类为 ctexart
+  (setq org-latex-default-class "ctexart"))
+
+;; 设置org-mode打开pdf的时候用zathura
+(setq org-file-apps
+      '(("\\.pdf\\'" . "zathura %s")
+        ("\\.x?html?\\'" . default)
+        ("\\.\\(?:png\\|jpe?g\\|gif\\)\\'" . default)
+        ("\\.mm\\'" . default)
+        (auto-mode . emacs)
+        (directory . emacs)
+        ))
+
+(provide 'init-org2latex)
+;; ================= 配置结束 =================

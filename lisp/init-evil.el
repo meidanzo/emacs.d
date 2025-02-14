@@ -789,7 +789,11 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "ih" 'my-git-goto-gutter ; use ivy-mode
   "ir" 'ivy-resume
   "ww" 'my-narrow-or-widen-dwim
-  "wf" 'popup-which-function)
+  "wf" 'popup-which-function
+  "c,c" 'TeX-command-master
+  "c,a" 'TeX-command-run-all
+  "c,v" 'my-TeX-run-all-no-sync
+  "c,e" 'LaTeX-environment)
 ;; }}
 
 ;; {{ Use `SPC` as leader key
