@@ -1,0 +1,18 @@
+# -*- mode: snippet -*-
+# name: stdc++.h
+# key: include
+# --
+
+#include <bits/stdc++.h>
+
+using namespace std;
+
+int main()
+{
+    // ios::sync_with_stdio(false); // 提高 IO 效率
+    // cin.tie(0);                  // 解除 cin 和 cout 的绑定
+
+    $0
+
+    return 0;
+}

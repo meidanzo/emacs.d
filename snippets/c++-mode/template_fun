@@ -1,0 +1,11 @@
+# -*- mode: snippet -*-
+# name:template_fun 
+# key:template 
+# --
+
+template <class... Args>
+$1  $2 ($3 , Args &&...args)
+{
+    $0
+}
+
