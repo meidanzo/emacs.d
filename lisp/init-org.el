@@ -194,9 +194,9 @@ ARG is ignored."
   ;; To install texlive-xetex:
   ;;    `sudo USE="cjk" emerge texlive-xetex` on Gentoo Linux
   (setq org-latex-pdf-process
-        '("xelatex -interaction nonstopmode -output-directory %o %f"
-          "xelatex -interaction nonstopmode -output-directory %o %f"
-          "xelatex -interaction nonstopmode -output-directory %o %f")) ;; org v8
+        '("xelatex -shell-escape -file-line-error -halt-on-error -interaction=nonstopmode -output-directory=%o %f"
+          "xelatex -shell-escape -file-line-error -halt-on-error -interaction=nonstopmode -output-directory=%o %f"
+          "xelatex -shell-escape -file-line-error -halt-on-error -interaction=nonstopmode -output-directory=%o %f")) ;; org v8
   ;; }}
 
   ;; {{ org-babel
@@ -251,4 +251,33 @@ ARG is ignored."
   (setq sage-shell:input-history-cache-file "~/data/sage_history")
   (add-hook 'sage-shell-after-prompt-hook #'sage-shell-view-mode))
 
+
+;; {{
+;; org文件快速添加代码快
+;; my-org-tempo-setting函数改编自 https://gitee.com/mickey991/emacs-config.git
+;; Original source:
+;;   https://gitee.com/mickey991/emacs-config.git
+;; Copyright (c) 2023 金色飞贼 (小米)
+;; Licensed under the MIT License
+(defun my-org-tempo-setting ()
+  (interactive)
+  (my-ensure 'org-tempo) ; 保证 org-structure-template-alist 可用
+  (setq org-structure-template-alist ; 用 org-tempo 快速插入代码块
+        '(("el" . "src elisp")
+          ("la" . "src latex")
+          ("sh" . "src shell")
+          ("sc" . "src c")
+          ("sp" . "src cpp")
+          ("a" . "export ascii")
+          ("c" . "center")
+          ("C" . "comment")
+          ("e" . "example")
+          ("E" . "export")
+          ("h" . "export html")
+          ("l" . "export latex")
+          ("q" . "quote")
+          ("s" . "src")
+          ("v" . "verse"))))
+;; }}
+(add-hook 'org-mode-hook #'my-org-tempo-setting t)
 (provide 'init-org)

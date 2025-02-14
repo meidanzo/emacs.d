@@ -1,0 +1,13 @@
+# -*- mode: snippet -*-
+# name: C++ class 
+# key: class 
+# --
+
+class $1 {
+public:
+    ${1:ClassName}();
+    ~$1();
+
+private:
+    $0
+};

@@ -1,5 +1,9 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
 
+(dolist (dir (directory-files "~/.emacs.d/site-lisp/theme/" t "^[^.]"))
+  (when (file-directory-p dir)
+    (add-to-list 'custom-theme-load-path dir)))
+
 (defvar my-favorite-color-themes nil "My favorite color themes.")
 
 ;; someone mentioned that blink cursor could slow Emacs24.4
