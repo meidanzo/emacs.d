@@ -78,6 +78,7 @@
   - [[#set-up-lsp-mode][Set up lsp-mode]]
   - [[#enable-typewriter-sounds-when-typing][Enable typewriter sounds when typing]]
   - [[#pdf-tools][pdf-tools]]
+  - [[#latex-mode][LaTeX-mode]]
 - [[#support-legacy-emacs-versions][Support legacy Emacs versions]]
   - [[#emacs-27][Emacs 27]]
   - [[#emacs-26][Emacs 26]]
@@ -673,10 +674,21 @@ You can set =my-initial-evil-state-per-major-mode= to customize the initial evil
 (push '(ivy-occur-grep-mode . normal) my-initial-evil-state-per-major-mode)
 #+end_src
 ** Chinese Input Method Editor
+There are currently two Chinese input schemes available: one is emacs-rime, and the other is pyim. Both can be considered built-in input methods. Choose one of them to use.
+*** emacs-rime
+Please note emacs-rime is already built into this setup. You need not install it through ELPA.
+
+To use [[https://github.com/DogLooksGood/emacs-rime][emacs-rime]], you must first install [[https://github.com/DogLooksGood/emacs-rime/blob/master/INSTALLATION.org][librime]]. Additionally, you must use your own input scheme and reconfigure the value of =rime-user-data-dir= =rime-share-data-dir= in =init-rime.el=. This scheme differs from pyim.
+
+After installing emacs-rime, you can use the Chinese input method in insert mode. You can construct your own input method using appropriate assertions in init-rime.el.
+
+Please note that this repository has undergone significant changes since forking from [[https://github.com/redguardtoo/emacs.d][redguardtoo]]. It no longer uses pyim; The relevant enabling code has been commented out. If you wish to use it, uncomment the enabling code in init-chinese.el. 
+
+*** pyim
 Please note pyim is already built into this setup. You need not install it through ELPA.
 
 Run =M-x toggle-input-method= to toggle input method [[https://github.com/tumashu/pyim][pyim]].
-*** Use Pinyin
+**** Use Pinyin
 The default dictionary for pinyin might not be big enough. So you need install bigger dictionaries.
 
 Dictionaries with ".pyim" extension under the directory =~/.eim/= are automatically loaded.
@@ -688,7 +700,7 @@ The default pinyin scheme is =quanpin= but you can insert below code into =~/.cu
 (with-eval-after-load 'pyim
   (setq pyim-default-scheme 'xiaohe-shuangpin))
 #+end_src
-*** Use Wubi
+**** Use Wubi
 Dictionary for wubi is already installed. Please insert below code into =~/.custom.el= to enable wubi dictionary and use wubi scheme,
 #+begin_src elisp
 (setq my-pyim-enable-wubi-dict t)
@@ -805,6 +817,42 @@ Here is my setup in =~/.custom.el=,
        (setenv "PKG_CONFIG_PATH" "/usr/local/Cellar/zlib/1.2.8/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"))
      (pdf-loader-install))))
 #+end_src
+** LaTeX-mode
+
+The configuration for supporting =LaTeX-mode= is provided by =init-LaTeX-mode.el=. It has been tested only on Linux; other operating systems have not yet been verified.
+
+It should be noted that, due to differences in plugin support for various modes, =plain-tex-mode= and =doctex-mode= are currently not supported. If needed, please configure them manually.
+
+=init-LaTeX-mode.el= supports previewing LaTeX files. In a GUI environment, to automatically preview mathematical formulas within the =proof= environment, you need to remove =proof= from =TeX-fold-env-spec-list=; otherwise, you must manually run the =preview-latex= command to enable preview.
+
+This configuration is tightly integrated with =latexmk=, and the PDF viewer is invoked via =latexmk=. To use it without modification, add the following to =~/.latexmkrc=:
+
+#+begin_src perl
+$pdf_mode = 5;
+$pdf_update_method = 1;
+$preview_mode = 1;
+$preview_continuous_mode = 0;
+$engine = 'xetex';
+$pdflatex = 'xelatex -synctex=1 %O %S';
+$lualatex = 'lualatex -synctex=1 %O %S';
+$xelatex = "xelatex -file-line-error -halt-on-error -interaction=nonstopmode -synctex=1 %O %S";
+$xdvipdfmx = "xdvipdfmx -E -o %D %O %S";
+$go_mode = 1;
+$bibtex_use = 2;
+$pdf_previewer = 'zathura %O %S';
+$clean_ext = "los synctex.gz xdv";
+$env_clean = 1;
+#+end_src
+
+If Emacs is started as a daemon, add the following to your =zathurarc= to enable PDF forward and inverse search:
+
+#+begin_src shell
+set synctex true
+set synctex-editor-command "emacsclient --no-wait +%{line} %{input}"
+#+end_src
+
+For more detailed implementation and design explanations, please refer to the comments in =init-LaTeX-mode.el= and the documentation of the related plugins.
+
 * Support legacy Emacs versions
 ** Emacs 27
 Version 4.0 is the last version to support =Emacs 27=

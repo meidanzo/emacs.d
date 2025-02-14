@@ -108,6 +108,15 @@
 (autoload 'my-chinese-compare "my-chinese" "" t)
 (autoload 'vundo "vundo" "" t)
 (autoload 'yas-minor-mode-on "yasnippet" "" t)
+(autoload 'grip-mode "grip-mode" "Toggle grip-mode." t)
+(autoload 'grip-browse-preview "grip-mode" "Open GitHub preview." t)
+(autoload 'grip-stop-preview "grip-mode" "Stop grip preview." t)
+(autoload 'evil-snipe-mode "evil-snipe" nil t)
+(autoload 'evil-snipe-override-mode "evil-snipe" nil t)
+(autoload 'my-rime-commit1-and-evil-normal "init-rime" nil t)
+(autoload 'ivy-bibtex "ivy-bibtex" "" t)
+(autoload 'my-posframe-color-setup "init-rime-ui" "" t)
+
 
 (provide 'init-autoload)
 ;;; init-autoload.el ends here
