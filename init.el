@@ -187,3 +187,170 @@
 ;;; no-byte-compile: t
 ;;; End:
 (put 'erase-buffer 'disabled nil)
+
+
+;;org文件快速添加代码快
+(require 'org-tempo)
+(add-hook 'c-mode-common-hook 'google-set-c-style)
+(add-hook 'c-mode-common-hook 'google-make-newline-indent)
+
+;;多个缓冲区进行gdb，代码在文章最后:http://tuhdo.github.io/c-ide.html
+(setq
+ gdb-many-windows t  ;; use gdb-many-windows by default
+ gdb-show-main t  ;; Non-nil means display source file containing the main routine at startup
+)
+
+;; 解决中英文混排的时候折行错误
+(global-visual-line-mode 1)
+(setq word-wrap-by-category t)
+
+;; 放弃自动备份文件
+;(setq make-backup-files nil)
+
+;; 启动自动开启 xclip-mode
+(require 'xclip)
+(xclip-mode 1)
+
+;;; ================= AUCTeX + latexmk + XeLaTeX + Zathura =================
+
+;; 支持中文 -> xetex
+;; 自动项目编译 -> latexmk
+;; 正向/反向搜索 -> SyncTeX  + ~/.config/zathura/zathurarc
+;; C-c C-a不高亮 -> my-TeX-run-all-no-sync
+;; C-c C-v高亮当前行 (-> SyncTeX ?) -> TeX-command-run-all -> TeX-view -> TeX-view-program-list
+;; 持续预览(PVS) -> LatexMk-PVC + ~/.latexmkrc
+;; org-mode中文文件可以转换成正确的LaTeX文件并通过编译 -> org-latex-classes
+
+;; ----------------- 使用建议 -----------------
+;; 编译: C-c C-c -> LatexMk
+;; 自动实时预览: C-c C-c → LatexMk-PVC
+;; 正向搜索(PDF): C-c C-v
+;; 反向搜索：在 Zathura 中按中键或 Ctrl+左键 (依 Zathura 配置)
+
+;; --- 自动 UTF-8 编码 ---
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(setq default-buffer-file-coding-system 'utf-8)
+
+;; --- AUCTeX 配置 ---
+(require 'tex)                   ;; 确保 AUCTeX 加载
+(setq TeX-auto-save t)           ;; 自动保存 TeX 辅助信息, AUCTeX 会自动生成.el 文件缓存一些解析信息, 加快解析速度.
+(setq TeX-parse-self t)          ;; 在打开 TeX 文件时自动解析文件结构
+                                 ;; 可以识别 \usepackage,章节结构等信息,方便智能补全和跳转
+(setq-default TeX-master nil)    ;; 默认主文件为 nil, 每次打开 TeX 文件时询问. 避免 AUCTeX 错误地选择主文件
+
+
+(setq-default TeX-engine 'xetex) ;; 默认使用 XeTeX 支持中文
+(setq TeX-PDF-mode t)            ;; 默认生成 PDF. 运行 C-c C-c 编译时直接生成 PDF, 而不是 DVI
+(setq TeX-command-default "LatexMk") ;; 默认使用 latexmk 编译
+
+;; --- 启动 Emacs server (反向搜索需要) ---
+(require 'server)
+(unless (server-running-p)
+  (server-start))
+
+;; --- SyncTeX 配置 ---
+(setq TeX-source-correlate-method 'synctex)
+(setq TeX-source-correlate-mode t)         ;; 打开源代码关联
+(setq TeX-source-correlate-start-server t) ;; 允许 PDF 点击跳转, 用于 SyncTeX 功能: 从 PDF 点击可以跳转到 TeX 源码
+(add-hook 'LaTeX-mode-hook 'TeX-source-correlate-mode) ;; 自动开启 TeX-source-correlate-mode, 实现 LaTeX ↔ PDF 同步
+
+;; --- PDF 查看器设为 Zathura ---
+(setq TeX-view-program-selection '((output-pdf "Zathura"))) ;; 选择 Zathura 作为查看器
+(setq TeX-view-program-list
+      '(("Zathura-NoSync" "zathura %o")
+        ("Zathura-Sync" "zathura --synctex-forward %n:0:%b %o")))
+;; 说明：
+;; %n → 当前行号
+;; %o → 当前列(一般可以忽略)
+;; %b → 文件名
+;; %p → PDF 文件路径
+
+(setq TeX-view-program-selection
+      '((output-pdf "Zathura-NoSync")))  ;; 默认 C-c C-a 不使用同步
+
+;; C-c C-v 使用同步
+(defun my-TeX-run-all-no-sync ()
+  "Run TeX-command-run-all but without SyncTeX highlighting."
+  (interactive)
+  (let ((TeX-view-program-selection
+         '((output-pdf "Zathura-Sync"))))
+    (call-interactively 'TeX-command-run-all)))  ;; 正确调用方式
+
+(define-key TeX-mode-map (kbd "C-c C-v") #'my-TeX-run-all-no-sync)
+
+;; --- latexmk 编译命令 ---
+(add-to-list 'TeX-command-list
+             '("LatexMk"
+               "latexmk -xelatex -interaction=nonstopmode -synctex=1 %s"
+               TeX-run-TeX nil t :help "Run latexmk"))
+
+;; 可选：持续预览(PVS)
+(add-hook 'LaTeX-mode-hook
+          (lambda ()
+            (unless (assoc "LatexMk-PVC" TeX-command-list)
+              (add-to-list 'TeX-command-list
+                           '("LatexMk-PVC"
+                             "latexmk -xelatex -interaction=nonstopmode -synctex=1 -pvc %s"
+                             TeX-run-TeX nil t :help "Run latexmk continuously")))))
+
+;; 让org-mode中文文件可以转换成正确的LaTeX文件并通过编译
+(with-eval-after-load 'ox-latex
+  ;; 注册 ctexart 类
+  (add-to-list 'org-latex-classes
+               '("ctexart"
+                 "\\documentclass[11pt]{ctexart}
+[DEFAULT-PACKAGES]
+[PACKAGES]
+[EXTRA]"
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+
+  ;; 注册 ctexrep 类
+  (add-to-list 'org-latex-classes
+               '("ctexrep"
+                 "\\documentclass[11pt]{ctexrep}
+[DEFAULT-PACKAGES]
+[PACKAGES]
+[EXTRA]"
+                 ("\\part{%s}" . "\\part*{%s}")
+                 ("\\chapter{%s}" . "\\chapter*{%s}")
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
+
+  ;; 注册 ctexbook 类
+  (add-to-list 'org-latex-classes
+               '("ctexbook"
+                 "\\documentclass[11pt]{ctexbook}
+[DEFAULT-PACKAGES]
+[PACKAGES]
+[EXTRA]"
+                 ("\\part{%s}" . "\\part*{%s}")
+                 ("\\chapter{%s}" . "\\chapter*{%s}")
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
+
+  ;; 设置全局默认导出类为 ctexart
+  (setq org-latex-default-class "ctexart")
+
+  ;; 使用 XeLaTeX编译
+  (setq org-latex-pdf-process
+        '("xelatex -shell-escape -interaction=nonstopmode -output-directory=%o %f"
+          "xelatex -shell-escape -interaction=nonstopmode -output-directory=%o %f")))
+
+;; 设置org-mode打开pdf的时候用zathura
+(setq org-file-apps
+      '(("\\.pdf\\'" . "zathura %s")
+        ("\\.x?html?\\'" . default)
+        ("\\.\\(?:png\\|jpe?g\\|gif\\)\\'" . default)
+        ("\\.mm\\'" . default)
+        (auto-mode . emacs)
+        (directory . emacs)
+        ))
+
+;; ================= 配置结束 =================
