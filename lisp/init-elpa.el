@@ -120,7 +120,15 @@
     zoutline
     company-c-headers
     graphql-mode
-    company-statistics)
+    company-statistics
+    google-c-style
+    auctex
+    auctex-cont-latexmk
+    auctex-label-numbers
+    cdlatex
+    amsreftex
+    posframe
+    rime)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -217,6 +225,14 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 ;; Fire up package.el and ensure the following packages are installed.
 ;;------------------------------------------------------------------------------
 
+;; {{ Fixed expiring GNU ELPA keys
+;; GNU ELPA GPG key will expire on Sep-2019. So we need install this package to
+;; update key or else users can't install packages from GNU ELPA.
+;; @see https://www.reddit.com/r/emacs/comments/bn6k1y/updating_gnu_elpa_keys/
+;; BTW, this setup uses MELPA only. So GNU ELPA GPG key is not used.
+;; 这个包放在最前面, 放置验证失败报错
+(require-package 'gnu-elpa-keyring-update)
+;; }}
 (require-package 'compat)
 (require-package 'async)
 ; color-theme 6.6.1 in elpa is buggy
@@ -327,18 +343,19 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'typescript-mode)
 ;; run "M-x pdf-tool-install" at debian and open pdf in GUI Emacs
 (require-package 'pdf-tools)
-(require-package 'pyim)
-(require-package 'pyim-wbdict) ; someone may use wubi IME, not me
-(require-package 'pyim-basedict)
+;; (require-package 'pyim)
+;; (require-package 'pyim-wbdict) ; someone may use wubi IME, not me
+;; (require-package 'pyim-basedict)
 (require-package 'esup)
+(require-package 'google-c-style)
+(require-package 'auctex)
+(require-package 'auctex-cont-latexmk)
+(require-package 'auctex-label-numbers)
+(require-package 'cdlatex)
+(require-package 'amsreftex)
+(require-package 'posframe)
+(require-package 'rime)
 
-;; {{ Fixed expiring GNU ELPA keys
-;; GNU ELPA GPG key will expire on Sep-2019. So we need install this package to
-;; update key or else users can't install packages from GNU ELPA.
-;; @see https://www.reddit.com/r/emacs/comments/bn6k1y/updating_gnu_elpa_keys/
-;; BTW, this setup uses MELPA only. So GNU ELPA GPG key is not used.
-(require-package 'gnu-elpa-keyring-update)
-;; }}
 
 ;; org => ppt
 (require-package 'org-re-reveal)

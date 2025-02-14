@@ -284,6 +284,7 @@ COUNT, BEG, END, TYPE is used.  If INCLUSIVE is t, the text object is inclusive.
 (setq-default evil-escape-delay 0.3)
 (setq evil-escape-excluded-major-modes '(dired-mode))
 (setq-default evil-escape-key-sequence "kj")
+(setq evil-escape-unordered-key-sequence t) ;; 允许倒序触发
 ;; disable evil-escape when input method is on
 (evil-escape-mode 1)
 ;; }}
@@ -790,6 +791,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "ir" 'ivy-resume
   "ww" 'my-narrow-or-widen-dwim
   "wf" 'popup-which-function)
+
 ;; }}
 
 ;; {{ Use `SPC` as leader key
@@ -1050,6 +1052,29 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   (my-org-leader-def
     "f" 'my-navigate-in-pdf
     "g" 'my-open-pdf-goto-page))
+
+(with-eval-after-load 'tex
+  (general-create-definer my-tex-comma-leader-def
+    :prefix ","
+    :states '(normal visual visual-line visual-block)
+    :keymaps 'TeX-mode-map)
+
+  (my-tex-comma-leader-def
+    "cm" 'TeX-command-master
+    "ca" 'TeX-command-run-all
+    "cn" 'my-TeX-view-with-SyncTeX-highlighting
+    "ch" 'my-TeX-view-with-SyncTeX-highlighting
+    "ce" 'LaTeX-environment
+    "ck" 'auctex-cont-latexmk-toggle
+    "cd" 'TeX-view
+    "c[" 'cdlatex-environment
+
+    ;; 兼容部分 vimTeX 命令
+    "lv" 'TeX-command-run-all
+    "lk" 'TeX-kill-job
+    "le" 'TeX-recenter-output-buffer
+    "lt" 'reftex-toc
+    "lc" 'TeX-clean))
 ;; }}
 
 
