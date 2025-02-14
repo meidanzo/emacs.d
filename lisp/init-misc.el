@@ -12,7 +12,7 @@
   '(message-mode)
   "The major modes where auto-save is disabled.")
 
-(setq auto-save-visited-interval 2)
+(setq auto-save-visited-interval 0.8)
 
 (defun my-auto-save-visited-predicate ()
   "Predicate to control which buffers are auto-saved."

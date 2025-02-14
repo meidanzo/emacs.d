@@ -1,5 +1,13 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
 
+    ;; emacs 设置tab键宽度为4个字符宽
+    ;;  (启用自动缩进功能)
+    ;;  (启用C语言缩进功能)
+    ;;  (缩进宽度为4个字符宽)
+    ;;  (打开语法高亮功能)
+;;(setq-default c-default-style "stroustrup")
+
+
 ;; Tip 1: use more popular style "linux" instead of "gnu",
 ;;
 ;;   (setq c-default-style '((java-mode . "java")
@@ -16,8 +24,11 @@
 (defun my-common-cc-mode-setup ()
   "Setup shared by all languages (java/groovy/c++ ...)."
   ;; give me NO newline automatically after electric expressions are entered
+  ;;默认设置:https://blog.csdn.net/nuaa_meteor/article/details/76653271
+  (setq c-basic-offset 4)
   (setq c-auto-newline nil)
-
+  (setq c-default-style "stroustrup")
+  ;(setq indent-tabs-mode nil)
   ;make DEL take all previous whitespace with it
   (c-toggle-hungry-state 1))
 
