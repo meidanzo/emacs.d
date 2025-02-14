@@ -50,6 +50,7 @@
     racket-mode
     auto-package-update
     web-mode
+    google-c-style
     kv
     helpful ; @see https://github.com/Wilfred/helpful/pull/283, need unstable version
     esxml ; nov is dependent on latest esxml
@@ -295,6 +296,7 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'hydra)
 (require-package 'ivy-hydra) ; @see https://oremacs.com/2015/07/23/ivy-multiaction/
 (require-package 'web-mode)
+(require-package 'google-c-style)
 (require-package 'iedit)
 (require-package 'websocket) ; for debug debugging of browsers
 (require-package 'undo-tree)

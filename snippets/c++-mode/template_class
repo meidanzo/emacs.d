@@ -1,0 +1,14 @@
+# -*- mode: snippet -*-
+# name: template_class
+# key: template
+# --
+
+template<class T>
+class $1 {
+public:
+    ${1:ClassName}();
+    ~$1();
+
+private:
+    $0
+};
