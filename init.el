@@ -174,6 +174,10 @@
                    (float-time (time-subtract after-init-time before-init-time)))
            gcs-done)
 
+;; 启动自动开启 xclip-mode
+(require 'xclip)
+(xclip-mode 1)
+
 ;;; Local Variables:
 ;;; no-byte-compile: t
 ;;; End:
