@@ -117,7 +117,7 @@
 
   ;; don't play with color-theme in light weight mode
   ;; color themes are already installed in `init-elpa.el'
-  (require-init 'init-theme)
+  ;; (require-init 'init-theme)
 
   ;; essential tools
   (require-init 'init-essential)
