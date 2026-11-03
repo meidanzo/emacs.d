@@ -100,6 +100,8 @@
   (require-init 'init-spelling t)
   (require-init 'init-ibuffer t)
   (require-init 'init-bookmark)
+  ;; (require-init 'init-ivy)
+  ;; (require-init 'init-ivy-bibtex)
   (require-init 'init-windows)
   (require-init 'init-javascript t)
   (require-init 'init-org t)
@@ -144,6 +146,8 @@
   (require-init 'init-writting t)
   (require-init 'init-pdf t)
   (require-init 'init-misc t)
+  (require-init 'init-LaTeX-mode)
+  (require-init 'init-org2latex)
 
   ;; ediff configuration should be last so it can override
   ;; the key bindings in previous configuration

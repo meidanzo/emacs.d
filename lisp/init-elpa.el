@@ -86,6 +86,8 @@
     pulseaudio-control
     undo-tree
     js-doc
+    ;; bibtex-completion
+    ;; ivy-bibtex
     wgrep
     tablist ; required by pdf-tools
     pdf-tools ; @see https://github.com/vedang/pdf-tools/issues/102
@@ -117,7 +119,13 @@
     workgroups2
     graphql-mode
     company-prescient
-    google-c-style)
+    google-c-style
+    auctex
+    auctex-cont-latexmk
+    auctex-label-numbers
+    cdlatex
+    amsreftex
+    evil-tex)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -255,6 +263,8 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'textile-mode)
 (require-package 'git-timemachine)
 (require-package 'exec-path-from-shell)
+;; (require-package 'bibtex-completion)
+;; (require-package 'ivy-bibtex)
 (require-package 'find-file-in-project)
 (require-package 'sudo-edit)
 (require-package 'command-log-mode)
@@ -352,6 +362,15 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'glsl-mode)
 (require-package 'tmr)
 (require-package 'package-lint) ; for package developer only
+
+;; LaTeX
+(require-package 'auctex)
+(require-package 'auctex-cont-latexmk)
+(require-package 'auctex-label-numbers)
+(require-package 'cdlatex)
+(require-package 'amsreftex)
+(require-package 'evil-tex)
+(require-package 'preview-auto)
 
 (when my-emacs30-p (require-package 'macher))
 

@@ -110,6 +110,7 @@
 (autoload 'cmd-rewind-mode "cmd-rewind" "" t)
 (autoload 'vundo "vundo" "" t)
 (autoload 'yas-minor-mode-on "yasnippet" "" t)
+;; (autoload 'ivy-bibtex "ivy-bibtex" "" t)
 (provide 'init-autoload)
 ;;; init-autoload.el ends here
 

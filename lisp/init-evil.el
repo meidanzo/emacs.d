@@ -879,6 +879,30 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   (my-org-leader-def
     "f" 'my-navigate-in-pdf
     "g" 'my-open-pdf-goto-page))
+
+(with-eval-after-load 'tex
+  (general-create-definer my-tex-comma-leader-def
+    :prefix ","
+    :states '(normal visual visual-line visual-block)
+    :keymaps 'TeX-mode-map)
+
+  (my-tex-comma-leader-def
+    "cm" 'TeX-command-master
+    "ca" 'TeX-command-run-all
+    "cn" 'my-TeX-view-with-SyncTeX-highlighting
+    "ch" 'my-TeX-view-with-SyncTeX-highlighting
+    "ce" 'LaTeX-environment
+    "ck" 'auctex-cont-latexmk-toggle
+    "cd" 'TeX-view
+    "c[" 'cdlatex-environment
+    "c=" 'reftex-toc
+
+    ;; 兼容部分 vimTeX 命令
+    "lv" 'TeX-command-run-all
+    "lk" 'TeX-kill-job
+    "le" 'TeX-recenter-output-buffer
+    "lt" 'reftex-toc
+    "lc" 'TeX-clean))
 ;; }}
 
 
