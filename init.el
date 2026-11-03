@@ -42,6 +42,11 @@
                    (my-linux-p nil)
                    (t nil)))
 
+;; --- 自动 UTF-8 编码 ---
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(setq-default buffer-file-coding-system 'utf-8-unix)
+
 (defconst my-emacs-d (file-name-as-directory user-emacs-directory)
   "Directory of emacs.d.")
 
