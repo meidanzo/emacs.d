@@ -77,6 +77,8 @@
     typescript-mode ; the stable version lacks important feature (highlight function names)
     evil-exchange
     evil-find-char-pinyin
+    evil-snipe
+    evil-easymotion
     ;; {{ dependencies of stable realgud are too old
     load-relative
     loc-changes
@@ -313,6 +315,9 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'evil-nerd-commenter)
 (require-package 'evil-surround)
 (require-package 'evil-visualstar)
+(require-package 'evil-embrace)  ;; 必须和evil-surround保持一致, 要么都是 MELPA-Stable 要么都是 MELPA
+(require-package 'evil-snipe)
+(require-package 'evil-easymotion)
 (require-package 'undo-fu)
 (require-package 'keyfreq)
 (require-package 'adoc-mode) ; asciidoc files

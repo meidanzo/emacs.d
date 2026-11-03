@@ -111,6 +111,8 @@
 (autoload 'vundo "vundo" "" t)
 (autoload 'yas-minor-mode-on "yasnippet" "" t)
 ;; (autoload 'ivy-bibtex "ivy-bibtex" "" t)
+(autoload 'evil-snipe-mode "evil-snipe" nil t)
+(autoload 'evil-snipe-override-mode "evil-snipe" nil t)
 (provide 'init-autoload)
 ;;; init-autoload.el ends here
 
