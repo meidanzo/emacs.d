@@ -113,6 +113,9 @@
 ;; (autoload 'ivy-bibtex "ivy-bibtex" "" t)
 (autoload 'evil-snipe-mode "evil-snipe" nil t)
 (autoload 'evil-snipe-override-mode "evil-snipe" nil t)
+(autoload 'grip-mode "grip-mode" "Toggle grip-mode." t)
+(autoload 'grip-browse-preview "grip-mode" "Open GitHub preview." t)
+(autoload 'grip-stop-preview "grip-mode" "Stop grip preview." t)
 (provide 'init-autoload)
 ;;; init-autoload.el ends here
 

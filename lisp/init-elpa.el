@@ -127,7 +127,9 @@
     auctex-label-numbers
     cdlatex
     amsreftex
-    evil-tex)
+    evil-tex
+    ox-gfm
+    grip-mode)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -376,6 +378,10 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'amsreftex)
 (require-package 'evil-tex)
 (require-package 'preview-auto)
+
+;; preview
+(require-package 'ox-gfm)
+(require-package 'grip-mode)
 
 (when my-emacs30-p (require-package 'macher))
 

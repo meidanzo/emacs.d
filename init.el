@@ -148,6 +148,7 @@
   (require-init 'init-misc t)
   (require-init 'init-LaTeX-mode)
   (require-init 'init-org2latex)
+  (require-init 'init-preview) ; 用于 org-mode markdown 文件预览
 
   ;; ediff configuration should be last so it can override
   ;; the key bindings in previous configuration
