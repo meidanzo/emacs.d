@@ -179,6 +179,10 @@
                    (float-time (time-subtract after-init-time before-init-time)))
            gcs-done)
 
+;; 解决中英文混排的时候折行错误
+(global-visual-line-mode 1)
+(setq word-wrap-by-category t)
+
 ;; 启动自动开启 xclip-mode
 (require 'xclip)
 (xclip-mode 1)
