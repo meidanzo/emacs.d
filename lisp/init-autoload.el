@@ -116,6 +116,8 @@
 (autoload 'grip-mode "grip-mode" "Toggle grip-mode." t)
 (autoload 'grip-browse-preview "grip-mode" "Open GitHub preview." t)
 (autoload 'grip-stop-preview "grip-mode" "Stop grip preview." t)
+(autoload 'my-rime-commit1-and-evil-normal "init-rime" nil t)
+(autoload 'my-posframe-color-setup "init-rime-ui" "" t)
 (provide 'init-autoload)
 ;;; init-autoload.el ends here
 

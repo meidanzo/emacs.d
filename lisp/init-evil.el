@@ -281,7 +281,7 @@ COUNT, BEG, END, TYPE is used.  If INCLUSIVE is t, the text object is inclusive.
 ;; }}
 
 ;; {{ https://github.com/syl20bnr/evil-escape
-(setq-default evil-escape-delay 0.3)
+(setq-default evil-escape-delay 0.09)
 (setq evil-escape-excluded-major-modes '(dired-mode))
 (setq-default evil-escape-key-sequence "kj")
 ;; disable evil-escape when input method is on
@@ -729,9 +729,9 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
                 ((minibufferp)
                  my-default-color)
                 (current-input-method
-                 '("#e80074" . "#ffffff"))
+                 '("#a3be8c" . "#3b4252"))
                 ((evil-insert-state-p)
-                 '("#e80000" . "#ffffff"))
+                 '("#d08770" . "#ffffff"))
                 ((evil-emacs-state-p)
                  '("#444488" . "#ffffff"))
                 ((buffer-modified-p)

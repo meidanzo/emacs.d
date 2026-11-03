@@ -129,7 +129,9 @@
     amsreftex
     evil-tex
     ox-gfm
-    grip-mode)
+    grip-mode
+    posframe
+    rime)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -382,6 +384,10 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 ;; preview
 (require-package 'ox-gfm)
 (require-package 'grip-mode)
+
+;; rime
+(require-package 'posframe)
+(require-package 'rime)
 
 (when my-emacs30-p (require-package 'macher))
 

@@ -149,6 +149,9 @@
   (require-init 'init-LaTeX-mode)
   (require-init 'init-org2latex)
   (require-init 'init-preview) ; 用于 org-mode markdown 文件预览
+  (require-init 'init-rime-ui)
+  (require-init 'init-rime) ;; init-rime需要使用 site-lisp 中的 im-cursor-chg
+
 
   ;; ediff configuration should be last so it can override
   ;; the key bindings in previous configuration
@@ -191,6 +194,8 @@
 ;; 启动自动开启 xclip-mode
 (require 'xclip)
 (xclip-mode 1)
+
+(require 'rime)
 
 ;;; Local Variables:
 ;;; no-byte-compile: t
