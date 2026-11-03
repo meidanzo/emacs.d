@@ -7,19 +7,22 @@
 ;;                           (other . "linux")))
 
 ;; Tip 2: Search my article "C/C++/Java code indentation in Emacs"
-;; My code might be obsolete, but the knowledge is still valid.kk
+;; My code might be obsolete, but the knowledge is still valid.
 ;;
 ;; C code example:
 ;;   if(1) // press ENTER here, zero means no indentation
 ;;   void fn() // press ENTER here, zero means no indentation
+(require 'google-c-style)
 
 (defun my-common-cc-mode-setup ()
   "Setup shared by all languages (java/groovy/c++ ...)."
-  ;; give me NO newline automatically after electric expressions are entered
-  (setq c-auto-newline nil)
 
   ;make DEL take all previous whitespace with it
-  (c-toggle-hungry-state 1))
+  (c-toggle-auto-hungry-state 1)
+
+  ;; give me NO newline automatically after electric expressions are entered
+  ;;默认设置:https://blog.csdn.net/nuaa_meteor/article/details/76653271
+  (setq c-auto-newline nil))
 
 (defun my-c-mode-setup ()
   "C/C++ only setup."
@@ -36,7 +39,16 @@
   (push '(nil "^DEFUN *(\"\\([a-zA-Z0-9-]+\\)" 1) imenu-generic-expression )
 
   ;; make a #define be left-aligned
-  (setq c-electric-pound-behavior (quote (alignleft))))
+  (setq c-electric-pound-behavior (quote (alignleft)))
+
+  ;; google-style设置
+  (google-set-c-style)
+  (google-make-newline-indent)
+  (setq c-basic-offset 4)
+
+  ;;多个缓冲区进行gdb，@see http://tuhdo.github.io/c-ide.html
+  (setq gdb-many-windows t  ;; use gdb-many-windows by default
+        gdb-show-main t))    ;; Non-nil means display source file containing the main routine at startup
 
 (defun c-mode-common-hook-setup ()
   "C/C++ setup."

@@ -116,7 +116,8 @@
     jupyter
     workgroups2
     graphql-mode
-    company-prescient)
+    company-prescient
+    google-c-style)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -284,6 +285,7 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'company)
 (require-package 'native-complete)
 (require-package 'company-prescient)
+(require-package 'google-c-style)
 (require-package 'pyvenv)
 (require-package 'legalese)
 (require-package 'simple-httpd)
