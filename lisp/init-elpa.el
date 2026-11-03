@@ -212,6 +212,15 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 ;; Fire up package.el and ensure the following packages are installed.
 ;;------------------------------------------------------------------------------
 
+;; {{ Fixed expiring GNU ELPA keys
+;; GNU ELPA GPG key will expire on Sep-2019. So we need install this package to
+;; update key or else users can't install packages from GNU ELPA.
+;; @see https://www.reddit.com/r/emacs/comments/bn6k1y/updating_gnu_elpa_keys/
+;; BTW, this setup uses MELPA only. So GNU ELPA GPG key is not used.
+;; 这个包放在最前面, 防止验证失败报错
+(require-package 'gnu-elpa-keyring-update)
+;; }}
+
 (require-package 'compat)
 (require-package 'async)
 ; color-theme 6.6.1 in elpa is buggy
@@ -311,13 +320,6 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'pyim-basedict)
 (require-package 'esup)
 
-;; {{ Fixed expiring GNU ELPA keys
-;; GNU ELPA GPG key will expire on Sep-2019. So we need install this package to
-;; update key or else users can't install packages from GNU ELPA.
-;; @see https://www.reddit.com/r/emacs/comments/bn6k1y/updating_gnu_elpa_keys/
-;; BTW, this setup uses MELPA only. So GNU ELPA GPG key is not used.
-(require-package 'gnu-elpa-keyring-update)
-;; }}
 
 ;; org => ppt
 (require-package 'org-re-reveal)
