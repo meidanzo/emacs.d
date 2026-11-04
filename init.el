@@ -186,6 +186,10 @@
            (format "%.2f seconds"
                    (float-time (time-subtract after-init-time before-init-time)))
            gcs-done)
+;;; Local Variables:
+;;; no-byte-compile: t
+;;; End:
+(put 'erase-buffer 'disabled nil)
 
 ;; 解决中英文混排的时候折行错误
 (global-visual-line-mode 1)
@@ -201,8 +205,4 @@
 (keyfreq-mode 1)
 (keyfreq-autosave-mode 1)
 (turnon-keyfreq-mode)
-;;; Local Variables:
-;;; no-byte-compile: t
-;;; End:
-(put 'erase-buffer 'disabled nil)
 ;;; init.el ends here
