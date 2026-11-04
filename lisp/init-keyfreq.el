@@ -68,7 +68,8 @@
           undefined ;; lambda function
           wgrep-finish-edit
           xterm-paste
-          yank))
+          yank
+          rime--backspace))
   (setq keyfreq-excluded-regexp
         '("^ace-jump-"
           "^backward-"

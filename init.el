@@ -197,7 +197,12 @@
 
 (require 'rime)
 
+;; 启动快捷键记录
+(keyfreq-mode 1)
+(keyfreq-autosave-mode 1)
+(turnon-keyfreq-mode)
 ;;; Local Variables:
 ;;; no-byte-compile: t
 ;;; End:
 (put 'erase-buffer 'disabled nil)
+;;; init.el ends here
