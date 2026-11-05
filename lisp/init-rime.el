@@ -288,6 +288,7 @@ This function must be side-effect free and UI-agnostic."
   (define-key rime-mode-map (kbd "C-`") #'rime-send-keybinding)
   (define-key rime-mode-map (kbd "<f5>") #'rime-select-schema)
 
+  (setq rime-deactivate-when-exit-minibuffer t)          ;; 在 minibuffer 使用后自动关闭输入法
   (setq rime-disable-predicates
         '(rime-predicate-evil-mode-p                     ;; 在 evil-mode 的非编辑状态下
           rime-predicate-prog-in-code-p                  ;; 在 prog-mode 和 conf-mode 中除了注释和引号内字符串之外的区域
