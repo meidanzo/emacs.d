@@ -42,10 +42,11 @@
   (setq gc-cons-percentage 0.6)
   (setq gc-cons-threshold most-positive-fixnum))
 
-;; 禁用双向文本扫描
+;; 显示与交互性能优化
 ;; (setq-default bidi-display-reordering 'left-to-right) ;; 没必要的设置, 不为 nil 即可
 (setq-default bidi-paragraph-direction 'left-to-right)   ;; 将优化重点放在 bidi-paragraph-direction 上
 (setq bidi-inhibit-bpa t)
+(setq redisplay-skip-fontification-on-input t)           ;; Skip Fontification During Input
 
 (setq inhibit-startup-message t)
 
