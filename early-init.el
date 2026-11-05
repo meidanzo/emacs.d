@@ -42,6 +42,9 @@
   (setq gc-cons-percentage 0.6)
   (setq gc-cons-threshold most-positive-fixnum))
 
+;; 加载策略
+(setq load-prefer-newer t)   ; 让修改后的 .el 优先于旧的 .elc
+
 ;; 显示与交互性能优化
 ;; (setq-default bidi-display-reordering 'left-to-right) ;; 没必要的设置, 不为 nil 即可
 (setq-default bidi-paragraph-direction 'left-to-right)   ;; 将优化重点放在 bidi-paragraph-direction 上
