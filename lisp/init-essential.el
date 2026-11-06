@@ -163,6 +163,24 @@ If USE-INDIRECT-BUFFER is t, use `indirect-buffer' to hold widen content."
 (setq vc-make-backup-files nil)
 ;; }}
 
+;; {{ king-ring
+;; kill-ring 去重 & 跨会话保留
+(setq kill-do-not-save-duplicates t)
+;; 在不同会话中保留"Kill Ring"
+;; 会和 init-misc.el 当中的配置冲突
+;; (my-ensure 'cl-lib)
+;; (my-ensure 'savehist)
+;; (unless savehist-mode
+;;   (savehist-mode 1))
+;; (dolist (v '(search-ring regexp-search-ring kill-ring))
+;;   (add-to-list 'savehist-additional-variables v))
+;; (add-hook 'savehist-save-hook
+;;           (lambda ()
+;;             (setq kill-ring
+;;                   (mapcar #'substring-no-properties
+;;                           (cl-remove-if-not #'stringp kill-ring)))))
+;; }}
+
 ;; {{ save hooks
 ;; 保存时自动给脚本加可执行权限(仅对首行有 shebang 的可写文件生效)
 (add-hook 'after-save-hook
