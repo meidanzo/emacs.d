@@ -163,6 +163,12 @@ If USE-INDIRECT-BUFFER is t, use `indirect-buffer' to hold widen content."
 (setq vc-make-backup-files nil)
 ;; }}
 
+;; {{ save hooks
+;; 保存时自动给脚本加可执行权限(仅对首行有 shebang 的可写文件生效)
+(add-hook 'after-save-hook
+          #'executable-make-buffer-file-executable-if-script-p)
+;; }}
+
 (with-eval-after-load 'tramp
   (push (cons tramp-file-name-regexp nil) backup-directory-alist)
   ;; @see https://github.com/syl20bnr/spacemacs/issues/1921
