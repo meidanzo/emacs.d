@@ -46,12 +46,12 @@
 (setq load-prefer-newer t)   ; 让修改后的 .el 优先于旧的 .elc
 
 ;; 显示与交互性能优化
-;; (setq-default bidi-display-reordering 'left-to-right) ;; 没必要的设置, 不为 nil 即可
-(setq-default bidi-paragraph-direction 'left-to-right)   ;; 将优化重点放在 bidi-paragraph-direction 上
+(setq-default bidi-display-reordering t)
+(setq-default bidi-paragraph-direction 'left-to-right)
 (setq bidi-inhibit-bpa t)
 (setq redisplay-skip-fontification-on-input t)           ;; Skip Fontification During Input
 
-(setq inhibit-startup-message t)
+(setq inhibit-startup-screen t)
 
 ;; no menu bar, toolbar, scroll bar
 (setq default-frame-alist
