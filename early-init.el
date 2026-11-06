@@ -42,6 +42,8 @@
   (setq gc-cons-percentage 0.6)
   (setq gc-cons-threshold most-positive-fixnum))
 
+(setq read-process-output-max (* 1024 1024)) ;; <=$(cat /proc/sys/fs/pipe-max-size)
+
 ;; 加载策略
 (setq load-prefer-newer t)   ; 让修改后的 .el 优先于旧的 .elc
 
