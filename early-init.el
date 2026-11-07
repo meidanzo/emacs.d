@@ -42,6 +42,14 @@
   (setq gc-cons-percentage 0.6)
   (setq gc-cons-threshold most-positive-fixnum))
 
+;; {{ Character encoding
+;; 统一使用 UTF-8 编码
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+;; 新建文件默认使用 UTF-8 Unix 换行符
+(setq-default buffer-file-coding-system 'utf-8-unix)
+;; }}
+
 (setq read-process-output-max (* 1024 1024)) ;; <=$(cat /proc/sys/fs/pipe-max-size)
 
 ;; 加载策略
