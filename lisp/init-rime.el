@@ -170,7 +170,7 @@ Mainly adapted from `evil-escape-pre-command-hook'."
 
 ;; 不能和fcitx5-rime一个目录, 否则会有锁及同步等问题.
 (when (my-dir-check-p "~/.local/share/emacs-rime" t)
-  (setq rime-share-data-dir "~/.local/share/emacs-rime" )
+  ;; (setq rime-share-data-dir "/usr/share/rime-data") ;; 或你自己的公共方案目录
   (setq rime-user-data-dir "~/.local/share/emacs-rime"))
 
 ;; {{ UI 控制层
