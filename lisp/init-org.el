@@ -198,6 +198,9 @@ ARG is ignored."
      (shell . t)
      (lua . t)
      (js . t)
+     (makefile . t)
+     (sql . t)
+     (sqlite . t)
      ,@(when  (and (or my-linux-p my-wsl-p) (executable-find "jupyter"))
          '((jupyter . t)))))
 
@@ -205,19 +208,30 @@ ARG is ignored."
   (setq org-confirm-babel-evaluate nil)
   ;; }}
 
+  (when (my-dir-check-p "~/Documents/usernote/" t)
+    (setq org-directory "~/Documents/usernote/"))
+
   ;; misc
   (setq org-log-done 'time
         org-edit-src-content-indentation 0
+        org-src-fontify-natively t
+        org-src-tab-acts-natively t
         org-edit-timestamp-down-means-later t
         org-agenda-start-on-weekday nil ; start on the current day
         org-agenda-include-diary t
         org-agenda-window-setup 'current-window
         org-fast-tag-selection-single-key 'expert
         org-export-kill-product-buffer-when-displayed t
-        ;; org-startup-indented t
+        org-startup-indented t ;; 按层级自动缩进
+        org-ellipsis " ▾" ;; 设置 Org 标题折叠时显示的符号
+        org-hide-emphasis-markers t ;; 隐藏 *bold* /italic/ 等标记符号.
+                                    ;; 对表格/链接里的强调可能显示异常,若发现渲染错乱可临时
+                                    ;; M-x org-toggle-link-display 排查
+                                    ;; = / ~ 的配色改为下方 org-faces 的 face 定制；
+                                    ;; 其余 * / _ + 用 Org 默认 emphasis-alist 即可
         ;; {{ org 8.2.6 has some performance issue. Here is the workaround.
         ;; @see http://punchagan.muse-amuse.in/posts/how-i-learnt-to-use-emacs-profiler.html
-        org-agenda-inhibit-startup t ;; ~50x speedup
+        org-agenda-inhibit-startup t       ;; ~50x speedup
         org-agenda-use-tag-inheritance nil ;; 3-4x speedup
         ;; }}
         ;; org v8
@@ -231,6 +245,23 @@ ARG is ignored."
         org-todo-keywords (quote ((sequence "TODO(t)" "STARTED(s)" "|" "DONE(d!/!)")
                                   (sequence "WAITING(w@/!)" "SOMEDAY(S)" "PROJECT(P@)" "|" "CANCELLED(c@/!)")))
         org-imenu-depth 5))
+
+(with-eval-after-load 'org-indent
+  ;; 缩进模式下标题也缩进(默认只有正文缩进)
+  (setq-default org-indent-indentation-per-level 2))
+
+;; 自定义 Org 等宽、代码、折叠符的颜色
+;; 使用 face-override-spec 覆盖主题和 Custom 的 Face spec
+(with-eval-after-load 'org-faces
+  ;; Org emphasis faces
+  (face-spec-set 'org-verbatim '((t :foreground "#00BFFF")) 'face-override-spec) ; 等宽
+  (face-spec-set 'org-code '((t :foreground "green")) 'face-override-spec)   ; 代码
+  ;; Org folding indicator
+  (face-spec-set 'org-ellipsis
+                 '((t :foreground "#51afef"
+                      :underline nil
+                      :weight normal))
+                 'face-override-spec))
 
 ;; executing sage in org babel
 (with-eval-after-load 'ob-sagemath
@@ -249,24 +280,27 @@ ARG is ignored."
 ;; Copyright (c) 2023 金色飞贼 (小米)
 ;; Licensed under the MIT License
 (defun my-org-tempo-setting ()
+  "Load `org-tempo' and install custom structure templates."
   (interactive)
-  (my-ensure 'org-tempo) ; 保证 org-structure-template-alist 可用
-  (setq org-structure-template-alist ; 用 org-tempo 快速插入代码块
+  (my-ensure 'org-tempo)    ; 加载 org-tempo，激活 <el 等 tempo 触发器
+  (setq org-structure-template-alist  ; 用 org-tempo 快速插入代码块
         '(("el" . "src elisp")
           ("la" . "src latex")
           ("sh" . "src shell")
           ("sc" . "src c")
           ("sp" . "src cpp")
-          ("a" . "export ascii")
-          ("c" . "center")
-          ("C" . "comment")
-          ("e" . "example")
-          ("E" . "export")
-          ("h" . "export html")
-          ("l" . "export latex")
-          ("q" . "quote")
-          ("s" . "src")
-          ("v" . "verse"))))
-;; }}
+          ("a"  . "export ascii")
+          ("c"  . "center")
+          ("C"  . "comment")
+          ("e"  . "example")
+          ("E"  . "export")
+          ("h"  . "export html")
+          ("l"  . "export latex")
+          ("q"  . "quote")
+          ("sr" . "src")
+          ("v"  . "verse")))
+  (org-tempo-setup))
+
 (add-hook 'org-mode-hook #'my-org-tempo-setting t)
+;; }}
 (provide 'init-org)
