@@ -4,7 +4,7 @@
   (general-imap ","
     (general-key-dispatch 'self-insert-command
       :timeout 0.5
-      "/" 'my-toggle-input-method)))
+      "." 'my-toggle-input-method)))
 
 (provide 'init-no-byte-compile)
 ;;; init-no-byte-compile.el ends here
