@@ -720,8 +720,9 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
 ;; }}
 
 ;; {{ change modeline color by evil&ime state
-(defconst my-default-color (cons (face-background 'mode-line)
-                                 (face-foreground 'mode-line)))
+;; 让emacs -nw 启动时的modeline和以emacs --daemon 启动的一样.
+;; 颜色跟随终端. 
+(defconst my-default-color (cons 'unspecified 'unspecified))
 
 (defun my-show-evil-state ()
   "Change modeline color to notify user evil current state."
