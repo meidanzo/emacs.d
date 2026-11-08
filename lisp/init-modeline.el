@@ -55,6 +55,67 @@ mode line from being configured."
 ;; 文件在外部被修改时，让 auto-revert 同步 VC 状态。
 (setq auto-revert-check-vc-info t)
 
+;; ---------------------------------------------------------------------------
+;; VCS icon: 已跟踪但未暂存的修改
+;;
+;; `vc-state' 对“已暂存”和“未暂存”的修改都返回 `edited'，无法区分。
+;; 这里从 `git status --porcelain' 的 XY 状态码中取出第二位（工作区列）：
+;; 非空格表示存在未暂存的修改，此时把 VCS 图标显示为红色。
+;; ---------------------------------------------------------------------------
+
+(defvar my-vcs--capture-unstaged nil
+  "Non-nil while `vc-git-state' is computing the state.")
+
+(defvar my-vcs--last-unstaged nil
+  "Whether the current `vc-git-state' call found unstaged changes.")
+
+(defun my-vcs--codes-have-unstaged-p (codes)
+  "Return non-nil if git porcelain CODES contain unstaged changes.
+Each code is the two-character XY status from `git status --porcelain';
+the second character is the work-tree status."
+  (catch 'yes
+    (dolist (code codes)
+      (when (and (stringp code)
+                 (>= (length code) 2)
+                 (not (member code '("??" "!!")))
+                 (not (eq (aref code 1) ?\s)))
+        (throw 'yes t)))
+    nil))
+
+(defun my-vcs--record-unstaged-codes (orig codes)
+  "Record whether CODES contain unstaged changes, then call ORIG."
+  (when my-vcs--capture-unstaged
+    (setq my-vcs--last-unstaged (my-vcs--codes-have-unstaged-p codes)))
+  (funcall orig codes))
+
+(defun my-vcs--capture-git-state (orig file)
+  "Remember whether FILE has unstaged changes, then call ORIG."
+  (let ((my-vcs--capture-unstaged t)
+        (my-vcs--last-unstaged nil))
+    (prog1 (funcall orig file)
+      (vc-file-setprop file 'my-vcs-unstaged-p my-vcs--last-unstaged))))
+
+(with-eval-after-load 'vc-git
+  (advice-add 'vc-git--git-status-to-vc-state :around
+              #'my-vcs--record-unstaged-codes)
+  (advice-add 'vc-git-state :around #'my-vcs--capture-git-state))
+
+(defun my-doom-modeline-vcs-icon-color (&rest _)
+  "Color the VCS icon red when the file has unstaged changes."
+  (when (and buffer-file-name
+             doom-modeline--vcs
+             (eq (vc-state buffer-file-name) 'edited)
+             (vc-file-getprop buffer-file-name 'my-vcs-unstaged-p))
+    (let ((cell (assq 'icon doom-modeline--vcs)))
+      (when cell
+        (setcdr cell
+                (doom-modeline-vcs-icon "nf-dev-git_compare" "🔃" "*"
+                                        'doom-modeline-urgent))))))
+
+(with-eval-after-load 'doom-modeline
+  (advice-add 'doom-modeline-update-vcs :after
+              #'my-doom-modeline-vcs-icon-color))
+
 (defvar my-extra-mode-line-info '()
   "Extra info displayed at the end of the mode line.")
 
