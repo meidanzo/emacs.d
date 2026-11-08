@@ -17,6 +17,7 @@
 
 
 ;; - 使用方法
+;; 当 modeline 显示ㄓ符号(rime-lighter)的时候表示 emacs-rime 可用.
 ;; 进入 insert mode 自动激活输入法
 ;; C-\ 开启/关闭输入法
 ;; enter 键上屏编码而非字符
