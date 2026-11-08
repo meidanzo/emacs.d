@@ -199,11 +199,33 @@
          (:dirty  'my-rime-buffer-modified-indicator-face)
          (_       'my-rime-default-indicator-face))))))
 
+(defconst my-rime-modeline-entry '(:eval (my-rime-lighter))
+  "Mode-line construct displaying the rime indicator.")
+
 (defun my-rime-ui-modeline-setup ()
-  "ㄓ: modeline."
-  (add-to-list 'global-mode-string
-               '(:eval (my-rime-lighter))
-               t))
+  "ㄓ: modeline, always to the right of date and time."
+  ;; `display-time-mode' 也会把 `display-time-string' append 到
+  ;; `global-mode-string' 的末尾，本函数同样 append ㄓ，谁后初始化谁就在后面。
+  ;; daemon 启动时 display-time 在 init 中立即执行（见 `my-disable-idle-timer'），
+  ;; 普通启动时它由 2 秒 idle timer 延迟执行，所以两种启动方式下 ㄓ 与时间的
+  ;; 前后顺序相反。
+  ;; 这里先确保 `display-time-string' 在列表中（display-time-mode 便不会再追加），
+  ;; 再把 ㄓ 紧跟其后插入，固定为“时间在左、ㄓ在右”。
+  (let* ((entry my-rime-modeline-entry)
+         (items (remove entry global-mode-string))
+         (result nil))
+    ;; `global-mode-string' 的首元素必须是字符串（或列表）：`mode-line-misc-info'
+    ;; 的 `(global-mode-string ...)' 是条件构造，首元素若是符号，会被当作条件，
+    ;; 日期等内容就不会显示。`display-time-mode' 也用 '("") 占位。
+    (unless (stringp (car items))
+      (push "" items))
+    (unless (memq 'display-time-string items)
+      (setq items (append items '(display-time-string))))
+    (dolist (item items)
+      (push item result)
+      (when (eq item 'display-time-string)
+        (push entry result)))
+    (setq global-mode-string (nreverse result))))
 
 (defun my-rime-ui-candidate-setup ()
   "设置候选窗口."
