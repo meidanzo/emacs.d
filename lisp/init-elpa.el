@@ -131,7 +131,8 @@
     ox-gfm
     grip-mode
     posframe
-    rime)
+    rime
+    doom-modeline)
   "Packages to install from melpa-unstable.")
 
 (defvar melpa-stable-banned-packages nil
@@ -388,6 +389,9 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 ;; rime
 (require-package 'posframe)
 (require-package 'rime)
+
+;; modeline
+(require-package 'doom-modeline)
 
 (when my-emacs30-p (require-package 'macher))
 
