@@ -1,0 +1,14 @@
+#+title: Change cursor color for input method
+
+This package is use for changing the cursor color when switching input method in Emacs.
+
+** Usage
+Put the following code in your Emacs init file.
+
+#+begin_src emacs-lisp
+(require 'im-cursor-chg)
+(cursor-chg-mode 1)
+#+end_src
+
+** About license
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.

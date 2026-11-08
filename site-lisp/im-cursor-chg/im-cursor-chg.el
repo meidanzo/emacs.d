@@ -1,26 +1,40 @@
 ;;; im-cursor-chg.el --- Change cursor color for input method  -*- lexical-binding: t; -*-
 
-;; Inspired by code from cursor-chg
-;; URL: https://github.com/emacsmirror/cursor-chg/blob/master/cursor-chg.el
+;; Copyright (C) 2021-2026 Eason Huang
+;; Copyright (C) 2025-2026 meidanzo <meidanzo@foxmail.com>
+
+;; Author: Eason Huang <aqua0210@163.com>
+;; Package-Requires: ((emacs "27.1"))
 ;; URL: https://github.com/Eason0210/im-cursor-chg
-;; LICENSE: https://www.emacswiki.org/
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
+;; Modification notice (GNU GPL v3, section 5(a)):
+;;
+;; This file is a modified version of im-cursor-chg, originally written
+;; by Eason Huang and available at
+;; <https://github.com/Eason0210/im-cursor-chg>.  This modified version
+;; is maintained at <https://github.com/meidanzo/im-cursor-chg>.
+;;
+;; Modified by meidanzo <meidanzo@foxmail.com> on the following dates:
+;;   2025-12-22  Add terminal cursor color support and restore the
+;;               terminal cursor color when Emacs exits or is suspended.
+;;   2025-12-24  Fix the cursor color being reset from white to black.
+;;   2026-11-08  Add an Evil visual-state cursor color, initialize the
+;;               default cursor color lazily, and refactor cursor color
+;;               handling.
 
 ;;; Commentary:
 ;;
-;; This package is compatible with GNU Emacs 30.1 and later.  It handles
-;; dynamic cursor color changes based on input method state and Evil visual mode.
-;; Tested for robustness in daemon and terminal modes.
-;;
-;; This software package must be used with Emacs-rime and must
-;; be loaded after Emacs-rime has been loaded.
-;;
+
+;; It is inspired by code from cursor-chg
+;; URL: https://github.com/emacsmirror/cursor-chg/blob/master/cursor-chg.el
+
 ;; To turn on the cursor color change by default,
 ;; put the following in your Emacs init file.
 ;;
 ;; (require 'im-cursor-chg)
 ;; (cursor-chg-mode 1)
 ;;
-
 ;;; Code:
 
 (require 'rime nil t)
