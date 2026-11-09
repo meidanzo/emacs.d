@@ -599,6 +599,8 @@ You can set =my-initial-evil-state-per-major-mode= to customize the initial evil
 ** Chinese Input Method Editor
 There are currently two Chinese input schemes available: one is emacs-rime, and the other is pyim. Both can be considered built-in input methods. Choose one of them to use.
 *** emacs-rime
+*note:* This has only been tested on Linux and has not been tested on other operating systems. On Linux, you just need to prepare `rime-user-data-dir` and it will be configured automatically.
+
 Please note emacs-rime is already built into this setup. You need not install it through ELPA.
 
 To use [[https://github.com/DogLooksGood/emacs-rime][emacs-rime]], you must first install [[https://github.com/DogLooksGood/emacs-rime/blob/master/INSTALLATION.org][librime]]. Additionally, you must use your own input scheme and reconfigure the value of =rime-user-data-dir= =rime-share-data-dir= in =init-rime.el=. This scheme differs from pyim.
@@ -709,7 +711,7 @@ Here is my setup in =~/.custom.el=,
      (pdf-loader-install))))
 #+end_src
 ** LaTeX-mode
-
+*note:* This has only been tested on Linux, not on other operating systems. On Linux, you just need to have LaTeX-full, latexmk, and zathura ready. 
 The configuration for supporting =LaTeX-mode= is provided by =init-LaTeX-mode.el=. It has been tested only on Linux; other operating systems have not yet been verified.
 
 It should be noted that, due to differences in plugin support for various modes, =plain-tex-mode= and =doctex-mode= are currently not supported. If needed, please configure them manually.
