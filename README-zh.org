@@ -1,0 +1,804 @@
+* 快速且健壮的 Emacs 配置
+
+[[https://github.com/redguardtoo/emacs.d/actions/workflows/test.yml][https://github.com/redguardtoo/emacs.d/actions/workflows/test.yml/badge.svg]]
+
+- 快速
+- 健壮。软件包可以离线安装
+- 支持 Windows。在 Windows 上，Find&Grep 只需最少的配置
+- 已在 Linux/Windows10/macOS/MSYS2/Cygwin 上用 Emacs 29.1 测试
+- 尊重原生的键位绑定和目录布局
+- 可在 [[https://packages.debian.org/emacs-nox][emacs-nox]] 和 [[http://www.putty.org/][PuTTY]] 中运行
+
+[[file:demo.png]]
+
+* 目录                                                                        :noexport:TOC:
+- [[#快速且健壮的-emacs-配置][快速且健壮的 Emacs 配置]]
+- [[#检查清单][检查清单]]
+- [[#安装][安装]]
+  - [[#从远程仓库安装软件包推荐][从远程仓库安装软件包（推荐）]]
+  - [[#从本地稳定仓库安装软件包可选][从本地稳定仓库安装软件包（可选）]]
+  - [[#一步安装所有内容可选][一步安装所有内容（可选）]]
+  - [[#第三方程序可选][第三方程序（可选）]]
+- [[#教程可选][教程（可选）]]
+  - [[#快速入门][快速入门]]
+  - [[#evil-mode-教程][Evil-mode 教程]]
+  - [[#方法论][方法论]]
+- [[#使用][使用]]
+  - [[#快速开始][快速开始]]
+  - [[#更好的运行时性能][更好的运行时性能]]
+  - [[#键位绑定][键位绑定]]
+- [[#常见问题][常见问题]]
+  - [[#设置-emacs-服务][设置 Emacs 服务]]
+  - [[#内存较小的电脑][内存较小的电脑]]
+  - [[#vim-与-emacs][Vim 与 Emacs]]
+  - [[#备份软件包][备份软件包]]
+  - [[#硬核调试技巧][硬核调试技巧]]
+  - [[#代码拼写检查][代码拼写检查]]
+  - [[#锁定软件包][锁定软件包]]
+  - [[#如何安装新软件包][如何安装新软件包？]]
+  - [[#用-git-blame-查看当前行][用 Git blame 查看当前行]]
+  - [[#保存加载窗口布局][保存/加载窗口布局]]
+  - [[#将此配置用作-git-的合并工具][将此配置用作 Git 的合并工具]]
+  - [[#默认终端-shell][默认终端 shell]]
+  - [[#覆盖默认设置][覆盖默认设置]]
+  - [[#代码导航][代码导航]]
+  - [[#代码自动补全][代码自动补全]]
+  - [[#配色主题][配色主题]]
+  - [[#终端-emacs-中的真彩色][终端 Emacs 中的真彩色]]
+  - [[#git-gutter][git-gutter]]
+  - [[#在-gui-emacs-中设置字体][在 GUI Emacs 中设置字体]]
+  - [[#用-git-同步配置][用 Git 同步配置]]
+  - [[#缩进][缩进]]
+  - [[#编辑-lisp][编辑 Lisp]]
+  - [[#使用-smart-mode-line-还是-powerline][使用 smart-mode-line 还是 powerline？]]
+  - [[#键位绑定不起作用][键位绑定不起作用？]]
+  - [[#org-mode][Org-mode]]
+  - [[#macos-用户][macOS 用户？]]
+  - [[#自定义全局变量][自定义全局变量]]
+  - [[#windows][Windows]]
+  - [[#yasnippet][Yasnippet]]
+  - [[#非英语用户][非英语用户]]
+  - [[#在公司防火墙后面][在公司防火墙后面]]
+  - [[#网络被封锁][网络被封锁]]
+  - [[#电子邮件][电子邮件]]
+  - [[#无法下载软件包][无法下载软件包？]]
+  - [[#使用-flycheck-或-flymake-进行语法检查][使用 Flycheck 或 Flymake 进行语法检查]]
+  - [[#禁用-vim-键位绑定][禁用 Vim 键位绑定]]
+  - [[#evil-配置][Evil 配置]]
+  - [[#中文输入法][中文输入法]]
+  - [[#安装多个版本的-emacs][安装多个版本的 Emacs]]
+  - [[#修改时间区域设置][修改时间区域设置]]
+  - [[#目录结构][目录结构]]
+  - [[#在-git-commit-前运行单元测试][在 git commit 前运行单元测试]]
+  - [[#python-开发][Python 开发]]
+  - [[#打字时启用打字机音效][打字时启用打字机音效]]
+  - [[#pdf-tools][pdf-tools]]
+  - [[#latex-mode][LaTeX-mode]]
+- [[#支持旧版-emacs][支持旧版 Emacs]]
+  - [[#emacs-28][Emacs 28]]
+  - [[#emacs-27][Emacs 27]]
+  - [[#emacs-26][Emacs 26]]
+  - [[#emacs-25][Emacs 25]]
+  - [[#emacs-244-和-245][Emacs 24.4 和 24.5]]
+  - [[#emacs-243][Emacs 24.3]]
+  - [[#emacs-23][Emacs 23]]
+- [[#提示][提示]]
+- [[#报告-bug][报告 Bug]]
+- [[#许可证][许可证]]
+
+* 检查清单
+- 需要 Emacs 29 或更高版本
+- 请阅读常见问题以禁用 [[http://www.vim.org][Vim]] 键位绑定
+- 请阅读“键位绑定”一节以了解键位绑定
+- Windows 用户最好下载捆绑了依赖的版本。例如，下载 "emacs-29.1-x86_64.zip" 而不是 "emacs-29.1-x86_64-no-deps.zip"
+- 来自 [[http://melpa.org][MELPA]] 的不稳定软件包是 *不可见的* ，而来自 [[https://stable.melpa.org][MELPA Stable]] 的稳定软件包是可见的。请修改 =lisp/init-elpa.el= 中的变量 =melpa-include-packages= 来安装不稳定软件包
+- 其他问题在常见问题中都有涉及
+* 安装
+请先删除 =~/.emacs=。=~= 表示[[https://en.wikipedia.org/wiki/Home_directory][主目录]]。
+
+大多数用户需要遵循“常规方式安装”一节。
+
+“安装稳定版本”一节 *当且仅当* 以下情况有用：
+- 你没有网络访问
+- 你从未使用过任何命令行程序
+
+** 从远程仓库安装软件包（推荐）
+有两种方式安装此配置（我推荐第一种）：
+
+第一种方式是下载[[https://github.com/redguardtoo/emacs.d/archive/master.zip][最新配置]]并将其内容解压到 =~/.emacs.d= ，或者在 shell 中运行命令 =cd ~; git clone https://github.com/redguardtoo/emacs.d.git .emacs.d= 。
+
+第二种方式是使用[[https://github.com/redguardtoo/emacs.d/archive/stable.zip][稳定配置]]，或者在 shell 中运行命令 =cd ~; git clone https://github.com/redguardtoo/emacs.d.git .emacs.d; cd .emacs.d; git reset --hard stable= 。
+
+默认情况下，软件包会在 Emacs 启动期间自动安装。
+
+有人反馈软件包仓库 [[http://melpa.org]] 在中国访问不畅。
+
+不用担心。启动 Emacs 后，你可以对“是否临时切换到中国的更快的软件包仓库？”这一问题回答“YES”。请注意，启动后你可以修改 =init-elpa.el= 中的变量 =package-archives= ，以永久切换到中国仓库。
+** 从本地稳定仓库安装软件包（可选）
+- 下载 [[https://github.com/redguardtoo/emacs.d/archive/stable.zip]]
+- 将其内容解压到空目录 =~/.emacs.d=
+- 下载 [[https://github.com/redguardtoo/myelpa/archive/stable.zip]]
+- 将 zip 解压到某处，例如 =~/projs/myelpa=
+- 确保 =~/projs/myelpa= 中存在名为 =archive-contents= 的文件
+- 取消 =lisp/init-elpa.el= 中包含 "myelpa" 的那一行的注释。路径 =~/myelpa/= 可以修改。
+- 现在启动 Emacs！
+
+现在你使用的是本地软件包仓库 =~/myelpa= 。
+
+你可以通过修改 =lisp/init-elpa.el= 切换到 http://elpa.gnu.org 或 http://melpa.org 等在线仓库。
+** 一步安装所有内容（可选）
+将 [[https://github.com/redguardtoo/my-emacs.d-snapshot]] 的内容下载到 =~/.emacs.d= 。就这样。
+
+不推荐日常使用，因为第三方软件包未针对最新 Emacs 优化。
+** 第三方程序（可选）
+*** 安装第三方程序
+大多数命令行程序可以通过 =默认包管理器= 安装。
+
+=默认包管理器= 可以是：
+- Cygwin 上的 [[https://github.com/transcode-open/apt-cyg][apt-cyg]]
+- [[https://www.msys2.org/docs/package-management/][MSYS2]] 的包管理器
+- macOS 上的 [[https://github.com/mxcl/homebrew][homebrew]]
+- Linux 上的任何包管理器（Debian/Ubuntu 上的 =apt=，Redhat 上的 =yum=，Arch 上的 =pacman=，Gentoo 上的 =emerge= ……）
+
+有些包管理器允许你为当前用户安装程序。例如，python 包管理器 =pip= 有 "[[https://packaging.python.org/tutorials/installing-packages/][--user]]" 选项。
+*** 命令行程序列表
+这些程序是 *可选的* 。
+
+请忽略与命令行程序相关的错误信息。例如，如果未安装 =aspell= 和 =hunspell= ，你可以忽略所有 flyspell 错误信息。
+**** fortune-zh 或 fortune
+显示中国古诗或来自随机来源的引语。请注意，在 macOS 上无法通过 [[https://brew.sh/][homebrew]] 安装 =fortune-zh= 。
+
+但有一个简单的变通方法：
+- 安装 fortune
+- 从 [[https://github.com/debiancn/fortune-zh]] 下载 =fortune-zh= 代码
+- 解压代码并在其目录中运行 =make=
+- 将数据文件和名为 =fortune-zh= 的脚本复制到 =fortune= 使用的相应目录中。复制前你可能需要编辑 =fortune-zh= 文件
+**** aspell 或 hunspell
+- =flyspell= 需要它
+**** divsvgm
+- =M-x org-latex-preview= 需要它
+**** latex
+- =M-x org-latex-preview= 需要它
+- 在 macOS 上运行 =brew install --cask mactex=
+- 在 Debian/Ubuntu Linux 上运行 =apt install texlive-full= 或 =apt install texlive-latex-base texlive-fonts-recommended texlive-latex-extra texlive-science cm-super=
+**** 来自 [[http://www.imagemagick.org/][ImageMagick]] 的 identify
+- =org-mode= 将 org 文件导出为包含图片的 odt 时需要它
+**** zip 和 unzip
+- =org-mode= 将 org 文件导出为 odt 文件时需要它
+**** xsel 或 xclip
+- Linux 下我的剪贴板命令 =copy-to-x-clipboard= 和 =paste-from-x-clipboard= 需要它
+**** [[http://www.cmake.org][CMake]]
+- =cpputils-cmake= 需要它
+- 使用 CMake 时请使用[[http://www.cmake.org/Wiki/CMake_FAQ][源外构建目录（out-of-source build tree）]]
+**** [[http://clang.llvm.org][Clang]]
+- =cpputils-cmake= 以及 [[https://github.com/company-mode/company-mode][company-mode]] 的 =company-clang= 需要它
+- 如果你使用 =cpputils-cmake= 和 =cmake=，=cpputils-cmake= 会为你完成所有配置。你无需阅读下一条！但请花 *几分钟学习 cmake 基础知识* ！[[https://github.com/redguardtoo/cpputils-cmake][cpputils-cmake 的 README]] 中有一份一分钟的分步指南，教你如何使用 cmake。
+- 如果你使用 =company-clang=，请将 =(setq company-clang-arguments '("-I/example1/dir" "-I/example2/dir"))= 加入 =init.el=
+**** Pandoc
+- =markdown-mode= 的 =markdown-preview= 需要它
+**** [[https://ctags.io/][Universal Ctags（推荐）]] 或 [[http://ctags.sourceforge.net][Exuberant CTags]]
+- 它生成用于代码导航和代码补全的 tags 文件
+- 许多与 tags 相关的软件包需要它
+- 参见[[http://redguardtoo.github.io/?p=1057][如何在 Emacs 中高效使用 ctags]]
+**** LibreOffice
+- 仅使用其可执行文件 =soffice= 将 odt 文件转换为 doc/pdf
+- 将 org-mode 导出为 odt 时会自动进行转换
+- 转换命令定义在变量 =org-export-odt-convert-processes= 中
+**** js-beautify
+- 美化 JavaScript 代码
+- 通过操作系统包管理器安装 [[http://pip.readthedocs.org/en/stable/installing/][pip]]，然后运行 =pip install jsbeautifier=
+**** aider
+- 终端中的 AI 结对编程工具。[[https://github.com/tninja/aider.el][aider.el]] 需要它
+- 通过操作系统包管理器安装 [[http://pip.readthedocs.org/en/stable/installing/][pip]]，然后运行 =pip install aider-install && aider-install=
+- 关于如何在 ollama 上设置它，参见 [[https://aider.chat/docs/llms/ollama.html]]
+**** StarDict 词典
+- 不需要命令行程序
+- =stardict.el= 需要它
+- 运行 =curl http://pkgs.fedoraproject.org/repo/pkgs/stardict-dic/stardict-dictd_www.dict.org_wn-2.4.2.tar.bz2/f164dcb24b1084e1cfa2b1cb63d590e6/stardict-dictd_www.dict.org_wn-2.4.2.tar.bz2 | tar jx -C ~/.stardict/dic= 和 =curl https://src.fedoraproject.org/repo/pkgs/stardict-dic/stardict-langdao-ec-gb-2.4.2.tar.bz2/41a71f5b3952709746dd7e52cf155b8b/stardict-langdao-ec-gb-2.4.2.tar.bz2 | tar jx -C ~/.stardict/dic= 来安装英语词典
+**** [[https://github.com/BurntSushi/ripgrep][ripgrep]]
+- =M-x fastctags-grep= 可选使用它在文件中搜索文本
+- 在 shell 中运行 =curl https://sh.rustup.rs -sSf | sh= 安装 [[https://www.rust-lang.org/][Rust]]，然后运行 =cargo install ripgrep=
+- 调整环境变量 =PATH= ，以便 Emacs 能找到 ripgrep
+**** [[http://www.sbcl.org/][sbcl]]
+- [[https://common-lisp.net/project/slime/][SLIME: The Superior Lisp Interaction Mode for Emacs]] 需要它
+**** ffmpeg
+- 某些 dired 命令使用 ffmpeg 处理视频/音频
+**** [[https://github.com/koalaman/shellcheck][shellcheck]]
+- 检查 shell 脚本语法
+- =flymake= 和 =flycheck= 需要它
+**** [[https://mkvtoolnix.download/][mkvtoolnix]]
+- dired buffer 中的 hydra 使用它
+**** [[https://pdfgrep.org/][pdfgrep]]
+- =my-pdfgrep-in-directory= 使用它
+**** [[https://github.com/psf/black][black]]
+[[https://github.com/radian-software/apheleia][apheleia-mode]] 使用的 Python 格式化工具，默认未启用。
+* 教程（可选）
+需要 Linux/Unix 知识。至少你需要了解“环境变量”、“shell”、“stdin”、“stdout”、“man”、“info”的含义。
+** 快速入门
+*** 第 1 步，学习基础知识
+至少你需要了解 Emacs 如何与其他命令行程序交互：
+- 什么是[[https://en.wikipedia.org/wiki/Environment_variable][环境变量]]
+- 什么是[[https://en.wikipedia.org/wiki/Pipeline_(Unix)][管道（Pipeline (Unix)）]]、[[https://en.wikipedia.org/wiki/Standard_streams][标准流]]
+
+*** 第 2 步，阅读官方教程
+在 Emacs 中按 =C-h t= （“C”表示 Ctrl 键，“M”表示 Alt 键）阅读内置教程。
+
+至少你需要学习：
+- 如何移动光标
+- =C-h v= 描述变量
+- =C-h f= 描述函数
+- =C-h k= 描述命令的键位绑定
+*** 第 3 步，了解 org-mode 基础
+[[http://orgmode.org/][Org-mode]] 用于记笔记和做计划。
+
+请观看 [[https://www.youtube.com/watch?v=oJTwQvgfgMM][Carsten Dominik 的演讲]]。它非常简单。唯一需要记住的快捷键是 =Tab= 。
+*** 第 4 步，从实际问题开始
+你可以访问 [[http://www.emacswiki.org/emacs/][EmacsWiki]] 寻找解决方案。新手可以在 [[http://www.reddit.com/r/emacs/]] 寻求帮助。
+*** 第 5 步（可选），提高你的 shell/CLI 技能
+你可以在 [[https://tldp.org/][The Linux Documentation Project]] 阅读免费的书籍/指南。
+** Evil-mode 教程
+Vim 用户必读：
+- 必须阅读 [[http://superuser.com/questions/246487/how-to-use-vimtutor][vimtutor]]。
+- 可选阅读 [[https://evil.readthedocs.io/en/latest/index.html]]
+** 方法论
+参见 [[https://github.com/redguardtoo/mastering-emacs-in-one-year-guide][Master Emacs in One Year]]。
+* 使用
+Emacs 原有配置或第三方软件包的配置都会得到尊重。
+
+** 快速开始
+在 Windows 上，你需要安装 Cygwin，它为 Emacs 提供命令行程序。Cygwin 可以安装在任何硬盘上，但强烈建议不要改变它相对于根驱动器的相对路径。
+
+安装 Ctags（Universal Ctags 更好，Exuberant Ctags 也可以）。在 Windows 上，你可以通过 Cygwin 安装 Ctags。
+
+运行 =fastctags= 的 =M-x fastctags-find-tag-at-point= 来导航代码。它使用 ctags 创建的 tags 文件。当你开始使用 =fastctags= 时，tags 文件会自动创建/更新。
+
+运行 =M-x fastctags-grep= 在项目中搜索文本（grep）。项目根目录会自动检测。
+
+运行 =find-file-in-project= 的 =M-x find-file-in-project-by-selected= 在项目中查找文件。项目根目录会自动检测。你也可以在 =.emacs= 中添加一行配置，例如 =(setq ffip-project-root "~/proj1/")= 。
+
+使用 Ctags 创建的 tags 文件，代码自动补全开箱即用。
+
+如果有任何关于配置的进一步问题，请在 =~/.emacs.d/lisp= 目录中 [[https://en.wikipedia.org/wiki/Grep][grep]]。
+** 更好的运行时性能
+*** 为什么打开文件很慢
+将下面的代码插入 =~/.custom.el= ，将 "/home/user1/your-file-path" 替换为你想打开的文件，
+#+begin_src elisp
+(defun profile-open-file ()
+  (interactive)
+  (profiler-start 'cpu)
+  (find-file "/home/user1/your-file-path")
+  (profiler-report)
+  (profiler-stop))
+#+end_src
+
+运行 =M-x profile-open-file= 并阅读报告。
+** 键位绑定
+不要死记任何键位绑定。尝试 =M-x any-command-in-emacs= ，会显示其键位绑定的提示。
+
+大多数键位绑定定义在 =lisp/init-evil.el= 中，少数键位定义在 =lisp/init-hydra.el= 中，后者使用了 [[https://github.com/abo-abo/hydra][Hydra]]。
+
+在任意位置按 =C-c C-y= 调出默认的 hydra 菜单。
+
+我推荐的教程中包含足够的命令相关信息。
+
+此外，“[[http://redguardtoo.github.io/posts/how-to-be-extremely-efficient-in-emacs.html][How to be extremely efficient in Emacs]]”列出了我常用的命令。
+
+按 =kj= 从 =evil-insert-state= 以及 Emacs 中的其他任何状态退出。它比 Vim 中的 =ESC= 或 Emacs 中的 =C-g= 高效得多。详情请在 =init-evil.el= 中搜索 =evil-escape= 。
+* 常见问题
+** 设置 Emacs 服务
+使用 [[file:tools/start-emacs-daemon.sh]] 设置 emacs 服务。
+*** macOS
+创建 "~/Library/LaunchAgents/org.gnu.emacs.daemon.plist"，
+#+begin_src xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>org.gnu.emacs.daemon</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/path/to/start-emacs-daemon.sh</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/emacs-daemon.out</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/emacs-daemon.err</string>
+  </dict>
+</plist>
+#+end_src
+运行 =launchctl load ~/Library/LaunchAgents/org.gnu.emacs.daemon.plist && launchctl start org.gnu.emacs.daemon= 以在 macOS 上启用并启动 emacs daemon。
+*** Linux
+创建 "~/.config/systemd/user/emacs.service"，
+#+begin_src confg
+[Unit]
+Description=Emacs text editor
+Documentation=info:emacs man:emacs(1) https://gnu.org/software/emacs/
+
+[Service]
+Type=forking
+ExecStart=/path/to/start-emacs-daemon.sh
+ExecStop=/path/to/start-emacs-daemon.sh stop
+Environment=SSH_AUTH_SOCK=%t/keyring/ssh
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+#+end_src
+运行 =systemctl --user enable emacs.service && systemctl --user start emacs.service= 以在 Linux 上启用并启动 emacs daemon。
+
+** 内存较小的电脑
+确保 =early-init.el= 或 =init.el= 开头有以下行，
+#+begin_src elisp
+(setq my-computer-has-smaller-memory-p t)
+#+end_src
+** Vim 与 Emacs
+我更喜欢 EVIL 提供的 vim 键位绑定。
+
+但我的工作流中也使用混合风格。参见 =init-evil.el= 中的函数 =my-optimize-evil= 。
+
+你可以在 =~/.custom.el= 中插入 =(my-optimize-evil)= 来启用它。
+** 备份软件包
+运行 =M-x elpamr-create-mirror-for-installed= 从已安装的软件包创建本地仓库。详情参见 [[https://github.com/redguardtoo/elpa-mirror]]。
+** 硬核调试技巧
+这个 Emacs 配置快速且健壮。
+
+因此大多数棘手问题来自你安装的额外第三方软件包。
+
+如果你无法通过 grep Emacs Lisp 代码解决问题，请尝试 [[https://en.wikipedia.org/wiki/Strace][Strace]]。
+
+调试 Emacs 发出的网络请求，
+#+begin_src sh
+strace -f -e trace=network -s 10000 -o ~/emacs-err.txt /usr/bin/emacs -nw
+#+end_src
+
+调试 Emacs 发出的系统 API 调用，
+#+begin_src sh
+strace -o ~/emacs-err.txt /usr/bin/emacs -nw
+#+end_src
+** 代码拼写检查
+此配置使用 [[https://github.com/redguardtoo/wucuo][wucuo]]，它是 =flyspell-mode= 和 =flyspell-prog-mode= 的替代品。
+
+Wucuo 快速、可靠且强大。它比其他文本编辑器和 IDE 的任何拼写检查方案都更好。
+
+如果你更喜欢自己的拼写检查方案，请先插入下面的代码以禁用 wucuo，
+#+begin_src elisp
+(setq my-disable-wucuo t)
+#+end_src
+
+关于拼写检查的更多知识，你可以阅读[[http://redguardtoo.github.io/posts/what-s-the-best-spell-check-set-up-in-emacs.html][我的文章]]和 =init-spelling.el= 中的代码。
+** 锁定软件包
+有些软件包对我的工作流非常重要，因此被锁定。
+
+这些软件包放在 =site-lisp/= 中。
+
+它们不会被软件包系统升级。
+
+请确保没有通过 elpa 安装相同的软件包。请检查 =.emacs.d= 根目录下 "elpa/" 目录的内容。
+** 如何安装新软件包？
+我只使用两个软件包仓库，
+- [[https://stable.melpa.org]]（存放稳定软件包）
+- [[https://melpa.org]]（存放最新但不稳定的软件包）
+
+如果稳定仓库中存在名为 =MY-PKG= 的软件包，你只需要一行配置，
+#+begin_src elisp
+(require-package 'MY-PKG)
+#+end_src
+
+这一行可以放在 =lisp/init-elpa.el= 或 =~/.custom.el= 中。
+
+你最好将所有与 =MY-PKG= 相关的内容放到 =~/.custom.el= 中，这样主分支的变更不会影响你自己的配置。
+
+如果稳定仓库中不存在该软件包，请先修改 =lisp/init-elpa.el= 中的 =melpa-include-packages= 。
+
+如果你擅长 Emacs Lisp，我鼓励你阅读 =init-elpa.el= 以了解软件包是如何管理的，
+** 用 Git blame 查看当前行
+运行 =vc-msg-show= 。
+
+如果你在当前行内选择一个区域，将显示 *提交所选片段的正确 commit* ，而不是最近一次修改整行的 commit。
+** 保存/加载窗口布局
+=SPC s s= 或 =M-x wg-create-workgroup= 保存窗口布局。
+=SPC l l= 或 =M-x wg-open-workgroup= 加载窗口布局。
+
+** 将此配置用作 Git 的合并工具
+此配置可能是 VCS 中最高效、最强大的合并工具。
+将下面的配置插入 =~/.gitconfig= ，
+#+begin_src js
+[mergetool.ediff]
+# use git mergetool ediff to resolve conflicts
+cmd = emacs -nw -Q --eval \"(setq startup-now t)\" -l \"~/.emacs.d/init.el\" --eval \"(progn (setq ediff-quit-hook 'kill-emacs) (if (file-readable-p \\\"$BASE\\\") (ediff-merge-files-with-ancestor \\\"$LOCAL\\\" \\\"$REMOTE\\\" \\\"$BASE\\\" nil \\\"$MERGED\\\") (ediff-merge-files \\\"$LOCAL\\\" \\\"$REMOTE\\\" nil \\\"$MERGED\\\")))\"
+#+end_src
+
+然后运行 =git mergetool -t ediff= 解决冲突。
+
+这是[[https://gist.github.com/redguardtoo/d4ecd51f785bd117a6a0][我的 ~/.gitconfig]]。你可以使用 [[https://github.com/redguardtoo/test-git-mergetool]] 练习。
+** 默认终端 shell
+运行 =M-x shell= 。如果你使用 Zsh 而不是 Bash，请修改 =init-term-mode.el= 。
+
+你可以自定义 =my-term-program=，其默认值为 =/bin/bash=。它由 =ansi-term= 使用。
+** 覆盖默认设置
+将你的设置放在 =~/.custom.el= 中，它会在其他 "*.el" 之后加载。
+
+因此你可以使用我的 Emacs 配置中定义的任何函数。
+
+下面是一个覆盖 =lisp/init-evil.el= 中定义的键位绑定的示例，
+#+begin_src elisp
+(with-eval-after-load 'evil
+  (my-space-leader-def
+    "ss" 'pwd
+    "ll" 'pwd
+    "pp" 'pwd))
+#+end_src
+** 代码导航
+如果安装了 Ctags，开箱即用。
+
+要导航，运行 =M-x fastctags-find-tag-at-point= 。
+
+要启用代码自动补全，至少运行一次 =M-x fastctags-scan-code= 。
+
+可选地，你可以在 =.emacs= 中添加 =(add-hook 'after-save-hook 'fastctags-virtual-update-tags)= 以自动更新 tags 文件。
+
+无需进一步配置。
+** 代码自动补全
+我假设你使用 [[https://github.com/company-mode/company-mode][company-mode]]。在此配置中，用户可以按数字键从 =company-mode= 中选择候选。要禁用此功能， =(setq my-company-select-by-number-p nil)= 。更多提示请参见 =my-company-zero-key-for-filter= 。
+
+** 配色主题
+*** 自动加载经典配色主题
+将下面的代码加入 =~/.custom.el= ，以在启动期间加载随机的经典深色配色主题，
+#+begin_src elisp
+(setq my-enable-startup-color-theme-p t)
+#+end_src
+
+如果你更喜欢使用自己的配色主题，则不需要上面这行。
+
+*** 预览配色主题
+查看 [[https://emacsthemes.com/]]。
+
+记下配色主题的名称（例如 molokai）。
+
+*** 手动设置配色主题（推荐）
+你可以用 =M-x my-load-theme= 切换主题。
+
+或者你可以在 =~/.custom.el= 或 =init.el= 末尾插入下面的代码，
+#+begin_src elisp
+;; 请注意配色主题的名称是 "molokai"
+(load-theme 'molokai t)
+#+end_src
+
+你也可以运行 =M-x random-color-theme= 加载随机配色主题。
+*** 在终端中使用配色主题
+使用 256 色只需一个 CLI 参数，无需额外配置，
+#+BEGIN_SRC sh
+TERM=xterm-256color emacs -nw
+#+END_SRC
+** 终端 Emacs 中的真彩色
+- 安装 Emacs 26
+- 安装[[https://gist.github.com/XVilka/8346728][支持真彩色的终端]]。我建议 Windows 上使用 [[https://mintty.github.io/][mintty]]，Linux 上使用 [[https://gnometerminator.blogspot.com/p/introduction.html][terminator]]，macOS 上使用 [[https://www.iterm2.com/][iTerm2]]
+- [[http://www.gnu.org/software/emacs/manual/html_node/efaq/Colors-on-a-TTY.html][设置并启动 Emacs]]
+** git-gutter
+在官方仓库合并我的 pull request 之前，我暂时使用修改版的 =git-gutter= 。
+
+你可以设置 =git-gutter:exp-to-create-diff= 让 git gutter 支持其他 VCS（例如 Perforce），
+#+begin_src elisp
+(setq git-gutter:exp-to-create-diff
+      (shell-command-to-string (format "p4 diff -du -db %s"
+                                       (file-relative-name buffer-file-name))))
+#+end_src
+
+请注意 =git-gutter= 假设命令行程序 [[https://www.gnu.org/software/diffutils/][diff]] 已加入环境变量 PATH。在 Windows 上你可能需要通过 MSYS2 或 Cygwin 安装它。
+** 在 GUI Emacs 中设置字体
+非中文用户可以使用 [[https://github.com/rolandwalker/unicode-fonts][unicode-fonts]]。
+
+中文用户可以使用 [[https://github.com/tumashu/cnfonts][cnfonts]]。
+
+它们不包含在此配置中。你需要手动安装。
+** 用 Git 同步配置
+从我的稳定配置同步：
+#+begin_src bash
+git pull https://redguardtoo@github.com/redguardtoo/emacs.d.git stable
+#+end_src
+
+或者最新配置：
+#+begin_src bash
+git pull https://redguardtoo@github.com/redguardtoo/emacs.d.git
+#+end_src
+
+你可以回滚 commit：
+#+begin_src bash
+# 始终从最新的相关 commit 开始
+git revert commit-2014-12-01
+git revert commit-2014-11-01
+#+end_src
+** 缩进
+先学习[[http://www.emacswiki.org/emacs/IndentationBasics][基础知识]]。然后使用[[http://redguardtoo.github.io/posts/easy-indentation-setup-in-emacs-for-web-development.html][我的方案]]。
+** 编辑 Lisp
+请注意，编辑 Lisp 时会启用 [[http://emacswiki.org/emacs/ParEdit][paredit-mode]]。搜索 "paredit cheat sheet" 学习其键位绑定。
+** 使用 smart-mode-line 还是 powerline？
+首先注释掉 =init.el= 中的 =(require 'init-modeline)= 。
+** 键位绑定不起作用？
+其他桌面应用程序可能会拦截键位绑定。例如，[[https://github.com/redguardtoo/emacs.d/issues/320][有报告称 Windows 8 上的 QQ 会拦截 "M-x"]]。
+** Org-mode
+按 =M-x org-version= ，然后阅读在线手册进行配置。
+
+例如， =org-capture= 需要[[http://orgmode.org/manual/Setting-up-capture.html#Setting-up-capture][手动配置]]。
+
+运行 =M-x org-open-at-point= 打开光标下的链接。Http 链接会由内置浏览器打开。 =C-u M-x org-open-at-point= 使用由 =browse-url-generic-program= 指定的外部浏览器，其值可以是 =/usr/bin/firefox= 。
+** macOS 用户？
+请将旧版 Emacs 22 和 ctags 替换为新版本。
+
+最简单的方法是修改[[https://en.wikipedia.org/wiki/PATH_(variable)][环境变量 PATH]]。
+** 自定义全局变量
+有些变量由此配置设置，因此你无法通过 =M-x customize= 修改它们。
+
+以下是设置这些变量的步骤：
+- 通过 =M-x customize= 找到变量描述。例如，如果某个变量的描述是 "Company Clang Insert Arguments"，那么变量名就是 =company-clang-insert-argument=
+- 在 =lisp/init-company.el= 中找到变量 =company-clang-insert-argument= 并修改其值
+
+顺便说一句，在修改我的代码之前，请 *先阅读我的代码注释* 。
+** Windows
+如果你使用 Windows Emacs，你需要让 Emacs 能找到 Cygwin/MSYS2 中的第三方命令行程序。请将 =C:\Cygwin64\bin= 或 =C:\msys64\bin= 添加到环境变量 =PATH= 。
+
+大多数命令行程序最初是为 macOS 和 Linux 开发的。它们只能处理 UTF-8 编码的文本。在 grep 文本或搜索文件时，Windows Emacs 需要在 Command Prompt 中运行命令行程序，而 Command Prompt 使用 UTF-16 编码的文本。因此，如果 Emacs 需要将非 ASCII 文本传递给外部命令行程序，你可能需要查看[[https://stackoverflow.com/questions/57131654/using-utf-8-encoding-chcp-65001-in-command-prompt-windows-powershell-window?noredirect=1&lq=1][在 Command Prompt / Windows Powershell (Windows 10) 中使用 UTF-8 编码 (CHCP 65001)]]。
+
+你可以在 PowerShell 中设置环境变量，例如，
+#+begin_src sh
+setx var_name "var_value"
+#+end_src
+
+在 Windows 上，环境变量 =HOME= 默认指向目录 =C:\Users\<username>=。你需要将 =.emacs.d= 文件夹复制到该目录。或者你可以修改 =HOME= 的值。
+
+我使用下面的 CLI 将变量 =HOME= 设置为 "c:\cygwin\home\cb"，
+#+begin_src sh
+setx HOME "c:\cygwin\home\cb"
+#+end_src
+
+** Yasnippet
+- 不必使用 =M-x yas-expand= 或按 =TAB= 键，你可以改为按 =M-j= 。
+- Yasnippet 开箱即用。但你可以 =M-x my-yas-reload-all= 强制 Yasnippet 编译所有 snippet。如果你运行过一次 =my-yas-reload-all=，那么每次添加新 snippet 后都需要运行它。=my-yas-reload-all= 的目的是让 Emacs 启动更快。
+- 你可以将自己的 snippet 添加到 =snippets/= 。
+- 在 =snippets/= 中运行 =grep -rns --exclude='.yas*' 'key:' *= 查看我自己的 snippet
+** 非英语用户
+Locale 必须 *兼容 UTF-8* 。例如，当我在 shell 中输入 =locale= 时，得到输出 =zh_CN.UTF-8= 。
+** 在公司防火墙后面
+在 shell 中运行下面的命令：
+#+begin_src bash
+http_proxy=http://yourname:passwd@proxy.company.com:8080 emacs -nw
+#+end_src
+** 网络被封锁
+尝试 [[https://github.com/XX-net/XX-Net]]。启动 XX-Net 后，在 shell 中运行命令 =http_proxy=http://127.0.0.1:8087 emacs -nw= 。
+** 电子邮件
+如果你使用 Gnus 收发邮件，请查看 =init-gnus.el= 并阅读[[https://github.com/redguardtoo/mastering-emacs-in-one-year-guide/blob/master/gnus-guide-en.org][我的 Gnus 教程]]。
+** 无法下载软件包？
+由于网络问题，某些软件包无法自动下载。
+
+运行 =M-x package-refresh-content= ，重启 Emacs，重新安装软件包。
+** 使用 Flycheck 或 Flymake 进行语法检查
+两个软件包都可用，但默认未启用。
+** 禁用 Vim 键位绑定
+默认使用 EVIL（Emacs 中的 Vim 模拟）。注释掉 init.el 中包含 =(require 'init-evil)= 的行即可卸载它。
+** Evil 配置
+它定义在 =lisp/init-evil.el= 中。按 =C-z= 在 Emacs 和 Vim 键位绑定之间切换。
+
+你可以访问[[https://github.com/emacs-evil/evil/][其网站]]下载免费的电子书。
+
+你可以设置 =my-initial-evil-state-per-major-mode= 来按 major mode 自定义初始 evil 状态，
+#+begin_src elisp
+;; `diff-mode' 使用 Emacs 原生键位绑定
+(push '(diff-mode . emacs) my-initial-evil-state-per-major-mode)
+#+end_src
+** 中文输入法
+目前有两种可用的中文输入方案：一种是 emacs-rime，另一种是 pyim。两者都可以视为内置输入法。选择其中一种使用。
+*** emacs-rime
+*注意:* 此项只在Linux上面测试过, 未在其余操作系统当中测试, 在Linux上面准备好rime-user-data-dir即可会自动配置好.
+请注意，emacs-rime 已内置于此配置中。你无需通过 ELPA 安装它。
+
+要使用 [[https://github.com/DogLooksGood/emacs-rime][emacs-rime]]，你必须先安装 [[https://github.com/DogLooksGood/emacs-rime/blob/master/INSTALLATION.org][librime]]。此外，你必须使用自己的输入方案，并在 =init-rime.el= 中重新配置 =rime-user-data-dir= 和 =rime-share-data-dir= 的值。此方案与 pyim 不同。
+
+安装 emacs-rime 后，你可以在 insert 模式下使用中文输入法。你可以在 init-rime.el 中使用适当的断言构建自己的输入法。
+
+请注意，此仓库自从从 [[https://github.com/redguardtoo/emacs.d][redguardtoo]] fork 以来发生了重大变化。它不再使用 pyim；相关的启用代码已被注释掉。如果你想使用它，请取消 init-chinese.el 中启用代码的注释。
+
+*** pyim
+请注意，pyim 已内置于此配置中。你无需通过 ELPA 安装它。
+
+运行 =M-x toggle-input-method= 切换输入法 [[https://github.com/tumashu/pyim][pyim]]。
+**** 使用拼音
+拼音的默认词典可能不够大。因此你需要安装更大的词典。
+
+=~/.eim/= 目录下扩展名为 ".pyim" 的词典会自动加载。
+
+请运行 =curl -L https://raw.githubusercontent.com/redguardtoo/pyim-tsinghua-dict/master/pyim-tsinghua-dict.pyim > ~/.eim/pyim-tsinghua-dict.pyim= 安装额外的词典。
+
+默认拼音方案是 =quanpin=，但你可以将下面的代码插入 =~/.custom.el= 切换到不同的拼音方案，
+#+begin_src elisp
+(with-eval-after-load 'pyim
+  (setq pyim-default-scheme 'xiaohe-shuangpin))
+#+end_src
+**** 使用五笔
+五笔词典已经安装。请将下面的代码插入 =~/.custom.el= 以启用五笔词典并使用五笔方案，
+#+begin_src elisp
+(setq my-pyim-enable-wubi-dict t)
+;; ;; @see https://github.com/tumashu/pyim-wbdict for more information
+;; (setq my-pyim-enable-wubi-dict pyim-wbdict-v86-enable)
+;; (setq my-pyim-enable-wubi-dict pyim-wbdict-v98-enable)
+;; (setq my-pyim-enable-wubi-dict pyim-wbdict-v98-morphe-enable)
+;; (setq my-pyim-enable-wubi-dict pyim-wbdict-v86-single-enable)
+#+end_src
+** 安装多个版本的 Emacs
+运行下面的命令将 Emacs 26.3 安装到目录 =~/myemacs/26.3= ：
+#+begin_src bash
+mkdir -p ~/tmp;
+curl http://ftp.gnu.org/gnu/emacs/emacs-26.3.tar.gz | tar xvz -C ~/tmp/emacs-26.3
+cd ~/tmp/emacs-26.3;
+mkdir -p ~/myemacs/26.3;
+rm -rf ~/myemacs/26.3/*;
+./configure --prefix=~/myemacs/26.3 --without-x --without-dbus --without-sound && make && make install
+#+end_src
+** 修改时间区域设置
+将下面的代码插入 =~/.emacs= 或 =~/.custom.el= ，
+#+begin_src elisp
+;; 使用 en_US locale 格式化时间。
+;; 如果不设置，则使用操作系统 locale。
+(setq system-time-locale "C")
+#+end_src
+** 目录结构
+=init.el= 是主文件。它包含其他 =*.el= 文件。
+
+=lisp/init-elpa.el= 定义了将从 [[http://melpa.org][MELPA]] 安装哪些软件包。
+
+软件包安装到目录 =elpa/= 中。
+
+我还手动下载并将一些软件包解压到 =site-lisp/=。=site-lisp/= 中的软件包对包管理器 *不可见* 。
+
+我自己的 snippet 位于 =snippets/= 。
+
+Git hooks 放在 =githooks= 目录中。
+
+其他目录不重要。
+** 在 git commit 前运行单元测试
+在 macOS/Linux/Cygwin 上，运行 =make githooks= 将 hooks 安装到 =.git/hooks= 。
+
+之后在 =git commit= 前会自动运行单元测试。
+** Python 开发
+请先确保安装了 python 及其包 `virtualenv`。
+
+要启用虚拟环境，请将下面的代码加入 =~/.custom.el= ，
+#+begin_src elisp
+(let* ((venv-dir "/path/to/my-venv"))
+  (when (and (file-exists-p venv-dir)
+             (executable-find pyvenv-virtualenvwrapper-python))
+    (pyvenv-activate venv-dir)))
+#+end_src
+
+激活虚拟环境后，你可以备份其软件包，
+#+begin_src sh
+source /path/to/my-venv/bin/activate && pip freeze > venv-requirements.txt && deactivate
+#+end_src
+
+恢复软件包，
+#+begin_src sh
+source /path/to/my-venv/bin/activate && pip install -r venv-requirements.txt && deactivate
+#+end_src
+
+你可能想修改 =/path/to/my-venv/pyvenv.cfg= 中的 =include-system-site-packages=
+
+** 打字时启用打字机音效
+运行 =M-x my-toggle-typewriter= 。进一步配置请查看内置的 =typewriter-mode.el= 。
+** pdf-tools
+查看其官方文档。
+
+这是我在 =~/.custom.el= 中的配置，
+#+begin_src elisp
+;; @see https://github.com/vedang/pdf-tools/
+;; Don't bother Windows
+(when (and (display-graphic-p) (or my-linux-p my-macos-p))
+  (my-run-with-idle-timer
+   2
+   (lambda ()
+     (when my-macos-p
+       (setenv "PKG_CONFIG_PATH" "/usr/local/Cellar/zlib/1.2.8/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"))
+     (pdf-loader-install))))
+#+end_src
+** LaTeX-mode
+*注意:* 此项只在Linux上面测试过, 未在其余操作系统当中测试, 在Linux上面准备好LaTeX-full, latexmk, zathura即可
+支持 =LaTeX-mode= 的配置由 =init-LaTeX-mode.el= 提供。它仅在 Linux 上测试过；其他操作系统尚未验证。
+
+需要注意的是，由于各类模式对插件的支持存在差异，目前不支持 =plain-tex-mode= 和 =doctex-mode= 。如有需要，请手动配置。
+
+=init-LaTeX-mode.el= 支持预览 LaTeX 文件。在 GUI 环境中，要自动预览 =proof= 环境中的数学公式，需要从 =TeX-fold-env-spec-list= 中移除 =proof=；否则必须手动运行 =preview-latex= 命令才能启用预览。
+
+此配置与 =latexmk= 紧密集成，PDF 查看器通过 =latexmk= 调用。要在不做修改的情况下使用，请将以下内容添加到 =~/.latexmkrc= ：
+
+#+begin_src perl
+$pdf_mode = 5;
+$pdf_update_method = 1;
+$preview_mode = 1;
+$preview_continuous_mode = 0;
+$engine = 'xetex';
+$pdflatex = 'xelatex -synctex=1 %O %S';
+$lualatex = 'lualatex -synctex=1 %O %S';
+$xelatex = "xelatex -file-line-error -halt-on-error -interaction=nonstopmode -synctex=1 %O %S";
+$xdvipdfmx = "xdvipdfmx -E -o %D %O %S";
+$go_mode = 1;
+$bibtex_use = 2;
+$pdf_previewer = 'zathura %O %S';
+$clean_ext = "los synctex.gz xdv";
+$env_clean = 1;
+#+end_src
+
+如果 Emacs 以 daemon 方式启动，请将以下内容添加到 =zathurarc= 以启用 PDF 正向和反向搜索：
+
+#+begin_src shell
+set synctex true
+set synctex-editor-command "emacsclient --no-wait +%{line} %{input}"
+#+end_src
+
+有关更详细的实现和设计说明，请参考 =init-LaTeX-mode.el= 中的注释以及相关插件的文档。
+
+* 支持旧版 Emacs
+** Emacs 28
+版本 4.2 是最后一个支持 =Emacs 28= 的版本
+请使用 [[https://github.com/redguardtoo/emacs.d/archive/4.2.zip]] 和 [[https://github.com/redguardtoo/myelpa/archive/4.2.zip]]。
+
+** Emacs 27
+版本 4.1 是最后一个支持 =Emacs 27= 的版本
+请使用 [[https://github.com/redguardtoo/emacs.d/archive/4.1.zip]] 和 [[https://github.com/redguardtoo/myelpa/archive/4.1.zip]]。
+
+** Emacs 26
+版本 4.0 是最后一个支持 =Emacs 26= 的版本
+请使用 [[https://github.com/redguardtoo/emacs.d/archive/4.0.zip]] 和 [[https://github.com/redguardtoo/myelpa/archive/4.0.zip]]。
+
+** Emacs 25
+版本 3.2 是最后一个支持 =Emacs 25= 的版本
+
+请使用 [[https://github.com/redguardtoo/emacs.d/archive/3.2.zip]] 和 [[https://github.com/redguardtoo/myelpa/archive/3.2.zip]]。
+** Emacs 24.4 和 24.5
+版本 2.9 是最后一个支持 =Emacs 24.4+= 的版本
+
+请使用 [[https://github.com/redguardtoo/emacs.d/archive/2.9.zip]] 和 [[https://github.com/redguardtoo/myelpa/archive/2.9.zip]]。
+** Emacs 24.3
+版本 2.6 是最后一个支持 =Emacs 24.3= 的版本。
+
+下载 [[https://github.com/redguardtoo/emacs.d/archive/2.6.zip]] 和 [[https://github.com/redguardtoo/myelpa/archive/2.6.zip]] 即可使用。
+** Emacs 23
+此配置的版本 1.2 是最后一个支持 Emacs v23 的版本。
+
+以下是使用该配置的步骤：
+- 下载 [[https://github.com/redguardtoo/emacs.d/archive/1.2.zip]]
+- 下载 [[https://github.com/redguardtoo/myelpa/archive/1.2.zip]]
+- 按照 =以最简单的方式安装稳定版本= 一节操作，但跳过下载步骤
+* 提示
+- 永远不要关闭默认开启的任何内置模式。未来版本的 Emacs 可能会假定它是开启的。请改为在 mode hook 中调整其标志！
+- Git 技能 *极其有用* 。请阅读 [[https://git-scm.com/book/en/][Pro Git]] 中的 "Git Basics"、"Git Branching"、"Git Tools" 章节
+- 此配置中的许多高级功能只在我的个人 =~/.custom.el= 中启用。在 =~/.emacs.d/lisp/= 中 grep =defvar my-.*= 找到它们。你可以从 =init-company.el= 和 =init-spelling.el= 开始。
+* 报告 Bug
+请先查看 [[http://www.emacswiki.org/emacs/][EmacsWiki]] 和我的常见问题。
+
+如果你仍然无法解决问题，
+- 在 shell 中使用选项 =--debug-init= 重启 Emacs
+- 在 Emacs 中运行 =M-x toggle-debug-on-error=
+- 重现问题并将错误信息发送给我
+
+启动 Emacs 的完整命令行是 =emacs -nw --debug-init= 。
+
+如果你使用 [[https://emacsformacosx.com][Emacs for Mac OS X]]，命令行是 =/Application/Emacs.app/Contents/MacOS/Emacs -nw --debug-init= 。
+
+如果是第三方软件包的问题，请将错误信息发送给原始开发者。
+
+如果 *你确定* 这是我的 bug，请在 [[https://github.com/redguardtoo/emacs.d]] 提交报告。不要给我发邮件！
+
+Bug 报告需要包含 *环境详情* 。
+* 许可证
+此程序是自由软件：你可以根据自由软件基金会发布的 [[file:LICENSE][GNU 通用公共许可证]] 第 3 版或（由你选择）任何更新版本重新分发和/或修改它。
+
+此程序的发布是希望它有用，但不提供任何担保，甚至没有适销性或特定用途适用性的默示担保。更多详情请参见 [[file:LICENSE][GNU 通用公共许可证]]。
