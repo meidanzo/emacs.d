@@ -1,4 +1,4 @@
-personal_ws-1.1 en 355
+personal_ws-1.1 en 358
 acodec
 adoc
 aider
@@ -354,3 +354,6 @@ zh
 zipf
 zsh
 WSLInterop
+bibtex
+im
+latexmk

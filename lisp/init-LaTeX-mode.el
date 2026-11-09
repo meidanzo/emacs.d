@@ -142,7 +142,6 @@
 
 (defun my-refresh-auctex-label-numbers (&rest _)
   "手动编译时更新标记和号码, 在TeX-command-buffer 中运行, 保留光标位置."
-  (declare (ignore _))
   (when (and (boundp 'TeX-command-buffer)
              TeX-command-buffer
              (bound-and-true-p auctex-label-numbers-mode)
