@@ -249,6 +249,10 @@ This function must be side-effect free and UI-agnostic."
   (derived-mode-p 'gud-mode
                   ;; 'gdb-inferior-io-mode ;; 可能会有需要输入中文的情况, 故注销.
                   ))
+
+(defun +rime-in-shell-p ()
+  (derived-mode-p
+   'comint-mode 'eshell-mode))
 ;; }}
 
 (defun my-rime-commit1-and-evil-normal ()
@@ -314,6 +318,7 @@ This function must be side-effect free and UI-agnostic."
           rime-predicate-punctuation-after-space-en-p    ;; 你在空格之后输入标点符号,并且应该使用英文标点
           +rime-english-prober                           ;; 仅在beancount, 或 TeX / LaTeX 非注释区域启用英文输入
           +rime-in-gud-p                                 ;; gud 缓冲区输入英文.
+          +rime-in-shell-p                               ;; 在 emacs shell 当中输入英文.
           ))
 
   ;; 断言生效情况下强制中文, 临时切换
