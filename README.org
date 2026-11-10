@@ -673,24 +673,29 @@ On macOS/Linux/Cygwin, run =make githooks= to install hooks into =.git/hooks=.
 
 Then unit test is run automatically before =git commit=.
 ** Python development
-Please make sure python and its package `virtualenv` is installed first.
+Python's built-in =venv= module is enough; the third-party =virtualenv=
+package is not required.
 
-To enable the virtual environment, add below code into =~/.custom.el=,
-#+begin_src elisp
-(let* ((venv-dir "/path/to/my-venv"))
-  (when (and (file-exists-p venv-dir)
-             (executable-find pyvenv-virtualenvwrapper-python))
-    (pyvenv-activate venv-dir)))
-#+end_src
+This config uses =pyvenv= to activate virtual environments inside Emacs
+and prefers [[https://docs.astral.sh/uv/][uv]] to create them (=uv venv=
+produces a standard environment that =pyvenv-activate= can use).  When
+uv is unavailable, =python3 -m venv= is used instead.
+
+- =M-x my-select-python-venv= selects and activates an environment (the
+  current project's =.venv= or =~/.venv=; empty input creates a new one).
+- =M-x my-python-create-venv= creates a new environment.
+- Existing project-local =.venv= directories are activated automatically
+  when a Python buffer is opened.  Set =my-python-auto-activate-venv= to
+  nil to disable this.
 
 After activating the virtual environment, you could backup its packages,
 #+begin_src sh
-source /path/to/my-venv/bin/activate && pip freeze > venv-requirements.txt && deactivate
+source /path/to/my-venv/bin/activate && uv pip freeze > venv-requirements.txt && deactivate
 #+end_src
 
 Restore the packages,
 #+begin_src sh
-source /path/to/my-venv/bin/activate && pip install -r venv-requirements.txt && deactivate
+source /path/to/my-venv/bin/activate && uv pip install -r venv-requirements.txt && deactivate
 #+end_src
 
 You might want to modify =include-system-site-packages= in =/path/to/my-venv/pyvenv.cfg=

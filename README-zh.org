@@ -676,24 +676,26 @@ Git hooks 放在 =githooks= 目录中。
 
 之后在 =git commit= 前会自动运行单元测试。
 ** Python 开发
-请先确保安装了 python 及其包 `virtualenv`。
+Python 自带的 =venv= 模块已经足够，不再需要第三方 =virtualenv= 包。
 
-要启用虚拟环境，请将下面的代码加入 =~/.custom.el= ，
-#+begin_src elisp
-(let* ((venv-dir "/path/to/my-venv"))
-  (when (and (file-exists-p venv-dir)
-             (executable-find pyvenv-virtualenvwrapper-python))
-    (pyvenv-activate venv-dir)))
-#+end_src
+此配置使用 =pyvenv= 在 Emacs 内激活虚拟环境，并优先用
+[[https://docs.astral.sh/uv/][uv]] 创建（ =uv venv= 生成标准虚拟环境，
+=pyvenv-activate= 可直接使用）；没有 uv 时回退到  =python3 -m venv= 。
+
+- =M-x my-select-python-venv= ：选择并激活虚拟环境（当前项目的 =.venv=
+  或 =~/.venv= ；输入为空则新建）。
+- =M-x my-python-create-venv= ：新建虚拟环境。
+- 打开 Python buffer 时，会自动激活项目里的 =.venv= ；将
+  =my-python-auto-activate-venv= 设为 nil 可关闭此行为。
 
 激活虚拟环境后，你可以备份其软件包，
 #+begin_src sh
-source /path/to/my-venv/bin/activate && pip freeze > venv-requirements.txt && deactivate
+source /path/to/my-venv/bin/activate && uv pip freeze > venv-requirements.txt && deactivate
 #+end_src
 
 恢复软件包，
 #+begin_src sh
-source /path/to/my-venv/bin/activate && pip install -r venv-requirements.txt && deactivate
+source /path/to/my-venv/bin/activate && uv pip install -r venv-requirements.txt && deactivate
 #+end_src
 
 你可能想修改 =/path/to/my-venv/pyvenv.cfg= 中的 =include-system-site-packages=
