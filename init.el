@@ -197,7 +197,10 @@
 (require 'rime)
 
 ;; 启动快捷键记录
-(keyfreq-mode 1)
-(keyfreq-autosave-mode 1)
-(turnon-keyfreq-mode)
+;; 仅当 keyfreq 尚未启动时才运行 turnon-keyfreq-mode
+(when (and (featurep 'keyfreq)
+           (not (bound-and-true-p keyfreq-mode))
+           (not (bound-and-true-p keyfreq-autosave-mode))
+           (fboundp 'turnon-keyfreq-mode))
+  (turnon-keyfreq-mode))
 ;;; init.el ends here
