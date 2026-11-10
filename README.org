@@ -169,7 +169,7 @@ But there is a simple workaround:
 - Required by my clipboard command =copy-to-x-clipboard= and =paste-from-x-clipboard= under Linux
 **** [[http://www.cmake.org][CMake]]
 - Required by =cpputils-cmake=
-- Please use [[http://www.cmake.org/Wiki/CMake_FAQ][out-of-source build tree]] when using CMake
+- Please use [[https://gitlab.kitware.com/cmake/community/-/wikis/FAQ#out-of-source-build-trees][out-of-source build tree]] when using CMake
 **** [[http://clang.llvm.org][Clang]]
 - Required by =cpputils-cmake=, =company-clang= from [[https://github.com/company-mode/company-mode][company-mode]]
 - If you use =cpputils-cmake= and =cmake=, =cpputils-cmake= will do all the setup for you. You need not read next item! But please spend *a few minutes to learn the basics of cmake*! There is a one minute step-by-step-guide in [[https://github.com/redguardtoo/cpputils-cmake][README of cpputils-cmake]] to teach you how to use cmake.
@@ -191,6 +191,7 @@ But there is a simple workaround:
 - AI pair programming in your terminal. It's required by [[https://github.com/tninja/aider.el][aider.el]]
 - Install [[http://pip.readthedocs.org/en/stable/installing/][pip]] through OS package manager, then =pip install aider-install && aider-install=
 - See [[https://aider.chat/docs/llms/ollama.html]] on how to set it up on ollama
+*Note:* already removed.
 **** StarDict dictionaries
 - Cli program is not needed
 - Required by =stardict.el=
@@ -403,7 +404,7 @@ If the package does not exist in the stable repository, modify =melpa-include-pa
 
 I encourage you to read =init-elpa.el= to understand how packages are managed if you are good at Emacs Lisp,
 ** Git blame current line
-Run =vc-msg-show=.
+Run the =vc-msg-show= function via =eval-expression=: press the shortcut =, e e=, then enter ~(vc-msg-show)~.
 
 If you select a region inside current line, the *correct commit which submits the selected snippet* is displayed instead of the latest commit touch the whole line.
 ** Save/Load windows layout
@@ -566,7 +567,8 @@ setx HOME "c:\cygwin\home\cb"
 - Instead of =M-x yas-expand= or pressing =TAB= key, you can press =M-j= instead.
 - Yasnippet works out of box. But you can =M-x my-yas-reload-all= to force Yasnippet compile all the snippets. If you run =my-yas-reload-all= once, you always need run it when new snippets is added. The purpose of =my-yas-reload-all= is to make Emacs start up faster.
 - You can add your snippets into =snippets/=.
-- Run =grep -rns --exclude='.yas*' 'key:' *= in =snippets/= to see my own snippets
+- Run ~grep -rns --exclude='.yas*' 'key:' *~ in =snippets/= to see my own snippets
+
 ** Non-English users
 Locale must be *UTF-8 compatible*. For example, as I type =locale= in shell, I got the output =zh_CN.UTF-8=.
 ** Behind corporate firewall
@@ -599,15 +601,15 @@ You can set =my-initial-evil-state-per-major-mode= to customize the initial evil
 ** Chinese Input Method Editor
 There are currently two Chinese input schemes available: one is emacs-rime, and the other is pyim. Both can be considered built-in input methods. Choose one of them to use.
 *** emacs-rime
-*note:* This has only been tested on Linux and has not been tested on other operating systems. On Linux, you just need to prepare `rime-user-data-dir` and it will be configured automatically.
-
-Please note emacs-rime is already built into this setup. You need not install it through ELPA.
-
 To use [[https://github.com/DogLooksGood/emacs-rime][emacs-rime]], you must first install [[https://github.com/DogLooksGood/emacs-rime/blob/master/INSTALLATION.org][librime]]. Additionally, you must use your own input scheme and reconfigure the value of =rime-user-data-dir= =rime-share-data-dir= in =init-rime.el=. This scheme differs from pyim.
 
 After installing emacs-rime, you can use the Chinese input method in insert mode. You can construct your own input method using appropriate assertions in init-rime.el.
 
-Please note that this repository has undergone significant changes since forking from [[https://github.com/redguardtoo/emacs.d][redguardtoo]]. It no longer uses pyim; The relevant enabling code has been commented out. If you wish to use it, uncomment the enabling code in init-chinese.el. 
+*note:* This has only been tested on Linux and has not been tested on other operating systems. On Linux, you just need to prepare `rime-user-data-dir` and it will be configured automatically.
+
+*note:* emacs-rime is already built into this setup. You need not install it through ELPA.
+
+*note:* that this repository has undergone significant changes since forking from [[https://github.com/redguardtoo/emacs.d][redguardtoo]]. It no longer uses pyim; The relevant enabling code has been commented out. If you wish to use it, uncomment the enabling code in init.el.
 
 *** pyim
 Please note pyim is already built into this setup. You need not install it through ELPA.
@@ -620,7 +622,7 @@ Dictionaries with ".pyim" extension under the directory =~/.eim/= are automatica
 
 Please run =curl -L https://raw.githubusercontent.com/redguardtoo/pyim-tsinghua-dict/master/pyim-tsinghua-dict.pyim > ~/.eim/pyim-tsinghua-dict.pyim= to install extra dictionaries.
 
-The default pinyin scheme is =quanpin= but you can insert below code into =~/.custom.el= to switch to a different pinyin scheme,
+The default pinyin scheme is =quanpin= but you can insert below code into =~/.custom.el= to switch to a different pinyin scheme.
 #+begin_src elisp
 (with-eval-after-load 'pyim
   (setq pyim-default-scheme 'xiaohe-shuangpin))
@@ -711,12 +713,11 @@ Here is my setup in =~/.custom.el=,
      (pdf-loader-install))))
 #+end_src
 ** LaTeX-mode
-*note:* This has only been tested on Linux, not on other operating systems. On Linux, you just need to have LaTeX-full, latexmk, and zathura ready. 
-The configuration for supporting =LaTeX-mode= is provided by =init-LaTeX-mode.el=. It has been tested only on Linux; other operating systems have not yet been verified.
+The configuration supporting =LaTeX-mode= is provided by =init-LaTeX-mode.el=. On Linux, simply install the texlive-full, latexmk, and zathura packages. It has only been tested on Linux; other operating systems have not yet been verified.
 
-It should be noted that, due to differences in plugin support for various modes, =plain-tex-mode= and =doctex-mode= are currently not supported. If needed, please configure them manually.
+Note that due to differences in plugin support across various modes, =plain-tex-mode= and =doctex-mode= are currently not supported. If needed, please configure them manually.
 
-=init-LaTeX-mode.el= supports previewing LaTeX files. In a GUI environment, to automatically preview mathematical formulas within the =proof= environment, you need to remove =proof= from =TeX-fold-env-spec-list=; otherwise, you must manually run the =preview-latex= command to enable preview.
+=init-LaTeX-mode.el= supports previewing LaTeX files. In a GUI environment, to automatically preview mathematical formulas within the =proof= environment, you need to remove =proof= from =TeX-fold-env-spec-list=; otherwise, you must manually run the =preview-latex= command to enable previewing.
 
 This configuration is tightly integrated with =latexmk=, and the PDF viewer is invoked via =latexmk=. To use it without modification, add the following to =~/.latexmkrc=:
 
