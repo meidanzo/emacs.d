@@ -59,14 +59,8 @@
   (setq org-latex-default-class "ctexart"))
 
 ;; 设置org-mode打开pdf的时候用zathura
-(setq org-file-apps
-      '(("\\.pdf\\'" . "zathura %s")
-        ("\\.x?html?\\'" . default)
-        ("\\.\\(?:png\\|jpe?g\\|gif\\)\\'" . default)
-        ("\\.mm\\'" . default)
-        (auto-mode . emacs)
-        (directory . emacs)
-        ))
+(with-eval-after-load 'org
+  (push '("\\.pdf\\'" . "zathura %s") org-file-apps))
 
 (provide 'init-org2latex)
 ;;; init-org2latex.el ends here
