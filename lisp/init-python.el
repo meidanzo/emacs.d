@@ -127,16 +127,19 @@ With prefix argument CREATE, create a new environment instead."
 
 ;; treesit for smart syntax highlight
 (add-to-list 'treesit-extra-load-path "~/.emacs.d/tree-sitter")
+;; Prepend instead of `setq': replacing the whole alist would discard
+;; remappings added by other packages or by the user.
 (when (treesit-language-available-p 'python)
   (setq major-mode-remap-alist
-        '((python-mode . python-ts-mode))))
+        (cons '(python-mode . python-ts-mode)
+              (assq-delete-all 'python-mode major-mode-remap-alist))))
 
 ;; Activate the project's .venv before starting the language server
 (add-hook 'python-mode-hook #'my-python-auto-activate-venv -90)
 (add-hook 'python-ts-mode-hook #'my-python-auto-activate-venv -90)
 
-;; LSP client
-(add-hook 'python-ts-mode-hook 'eglot-ensure)
+(add-hook 'python-mode-hook #'eglot-ensure)
+(add-hook 'python-ts-mode-hook #'eglot-ensure)
 
 
 (provide 'init-python)
