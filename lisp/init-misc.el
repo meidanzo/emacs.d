@@ -994,11 +994,15 @@ might be bad."
   (let* ((link (completing-read "Open pdf:::page: " my-pdf-view-from-history)))
     (when link
       (let* ((items (split-string link ":::"))
-             (pdf-page (string-to-number (nth 1 items))))
+             (pdf-page (string-to-number (nth 1 items)))
+             (link-base (file-name-base (car items))))
         (my-ensure 'org)
         (my-focus-on-pdf-window-then-back
          (lambda (pdf-file)
-           (when (string= (file-name-base pdf-file) (file-name-base pdf-file))
+           ;; Only jump when the displayed pdf matches the history entry.
+           ;; The old code compared `pdf-file' with itself, so it always
+           ;; jumped, even when the window showed a different pdf.
+           (when (string= (file-name-base pdf-file) link-base)
              (my-pdf-view-goto-page pdf-page))))))))
 
 (defun my-open-pdf-scroll-or-next-page (&optional n)
