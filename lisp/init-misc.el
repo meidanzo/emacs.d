@@ -1449,9 +1449,7 @@ If it's on, disable it and restore single window."
     (follow-mode 1)
     (message "Follow mode enabled"))))
 
-(use-package apheleia
-  :ensure t
-  :config
+(with-eval-after-load 'apheleia
   (push '(sh-mode . shfmt) apheleia-mode-alist))
 
 (use-package ast-grep :ensure t)
