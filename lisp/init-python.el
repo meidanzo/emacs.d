@@ -125,8 +125,27 @@ With prefix argument CREATE, create a new environment instead."
         (my-activate-python-venv venv)))))
 ;; }}
 
-;; treesit for smart syntax highlight
-(add-to-list 'treesit-extra-load-path "~/.emacs.d/tree-sitter")
+(when (and (treesit-available-p)
+           (executable-find "basedpyright-langserver")
+           (not (treesit-language-available-p 'python)))
+  (add-to-list 'treesit-extra-load-path "~/.emacs.d/tree-sitter")
+  ;; treesit for smart syntax highlight
+  (setq treesit-language-source-alist
+        `((python "https://github.com/tree-sitter/tree-sitter-python"
+                  ,(if (< (treesit-library-abi-version) 15)
+                       "v0.23.6"
+                     "master"))))
+  (add-to-list 'treesit-language-source-alist
+               `(python "https://github.com/tree-sitter/tree-sitter-python"
+                        ,(if (< (treesit-library-abi-version) 15)
+                             "v0.23.6"
+                           "master")))
+  (condition-case err
+      (treesit-install-language-grammar 'python)
+    (error (message "Python tree-sitter grammar install failed: %s" err)))
+  (unless (treesit-language-available-p 'python)
+    (message "Python tree-sitter grammar still unavailable after install.")))
+
 ;; Prepend instead of `setq': replacing the whole alist would discard
 ;; remappings added by other packages or by the user.
 (when (treesit-language-available-p 'python)
@@ -138,8 +157,28 @@ With prefix argument CREATE, create a new environment instead."
 (add-hook 'python-mode-hook #'my-python-auto-activate-venv -90)
 (add-hook 'python-ts-mode-hook #'my-python-auto-activate-venv -90)
 
-(add-hook 'python-mode-hook #'eglot-ensure)
-(add-hook 'python-ts-mode-hook #'eglot-ensure)
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               `((python-mode python-ts-mode)
+                 . ,(eglot-alternatives
+                     '(("basedpyright-langserver" "--stdio")
+                       ("pyright-langserver" "--stdio")
+                       "pylsp")))))
+
+(defun my-python-eglot-ensure ()
+  "Start Eglot when BasedPyright's language server is installed."
+  (when (or (executable-find "basedpyright-langserver")
+            (executable-find "pyright-langserver")
+            (executable-find "pyright")
+            (executable-find "pylsp"))
+    (eglot-ensure)))
+
+(add-hook 'python-mode-hook #'my-python-eglot-ensure)
+(add-hook 'python-ts-mode-hook #'my-python-eglot-ensure)
+
+(with-eval-after-load 'apheleia
+  (setf (alist-get 'python-mode apheleia-mode-alist) 'ruff
+        (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff))
 
 
 (provide 'init-python)
