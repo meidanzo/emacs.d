@@ -100,6 +100,7 @@
   (require-init 'init-windows)
   (require-init 'init-javascript t)
   (require-init 'init-org t)
+  (require-init 'init-tree-sitter t) ;; 需要在 init-python 前面
   (require-init 'init-python t)
   (require-init 'init-lisp t)
   (require-init 'init-yasnippet )

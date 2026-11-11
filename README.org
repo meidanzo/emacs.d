@@ -211,8 +211,8 @@ But there is a simple workaround:
 - Used by hydra in dired buffer
 **** [[https://pdfgrep.org/][pdfgrep]]
 - Used by =my-pdfgrep-in-directory=
-**** [[https://github.com/psf/black][black]]
-Python formatter used by [[https://github.com/radian-software/apheleia][apheleia-mode]] which is not enabled by default.
+**** [[https://docs.astral.sh/ruff/][ruff]]
+Python formatter used by [[https://github.com/radian-software/apheleia][apheleia-mode]], which is enabled for Python buffers by this config.
 **** [[https://github.com/ast-grep/ast-grep][ast-grep]]
 Ast-grep(sg) is a CLI tool for code structural search, lint, and rewriting.
 * Tutorial (OPTIONAL)
@@ -686,9 +686,13 @@ uv is unavailable, =python3 -m venv= is used instead.
 - =M-x my-select-python-venv= selects and activates an environment (the
   current project's =.venv= or =~/.venv=; empty input creates a new one).
 - =M-x my-python-create-venv= creates a new environment.
-- Existing project-local =.venv= directories are activated automatically
-  when a Python buffer is opened.  Set =my-python-auto-activate-venv= to
-  nil to disable this.
+- Valid project-local =.venv= directories (containing =pyvenv.cfg=) are
+  activated automatically when a Python buffer is opened.  Set
+  =my-python-auto-activate-venv= to nil to disable this.
+- Python buffers use Eglot with =basedpyright-langserver=,
+  =pyright-langserver=, or =pylsp=, in that order of preference.
+- =ruff= is the Apheleia formatter; =apheleia-mode= is enabled for
+  Python buffers, so saving formats with ruff.
 
 After activating the virtual environment, you could backup its packages,
 #+begin_src sh

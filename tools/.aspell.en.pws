@@ -1,4 +1,4 @@
-personal_ws-1.1 en 361
+personal_ws-1.1 en 363
 acodec
 adoc
 aider
@@ -360,3 +360,5 @@ im
 latexmk
 Ast
 sg
+Apheleia
+Eglot

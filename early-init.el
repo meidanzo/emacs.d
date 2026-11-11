@@ -33,6 +33,21 @@
           noninteractive)
   (setq package-enable-at-startup nil))
 
+;; Make user-installed binaries available even when Emacs is started
+;; from a desktop environment with a minimal PATH.
+(let ((local-bin (expand-file-name "~/.local/bin"))
+      (sep (if (characterp path-separator)
+               (char-to-string path-separator)
+             path-separator)))
+  (when (file-directory-p local-bin)
+    (add-to-list 'exec-path local-bin)
+    (let ((dirs (parse-colon-path (or (getenv "PATH") ""))))
+      (unless (member (file-name-as-directory local-bin) dirs)
+        (setenv "PATH"
+                (mapconcat #'identity
+                           (cons local-bin dirs)
+                           sep))))))
+
 (defvar my-computer-has-smaller-memory-p nil
   "Installing&Compiling many packages could cost too much memory.")
 
