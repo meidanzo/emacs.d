@@ -562,9 +562,11 @@ ARG is ignored."
 (advice-add 'wgrep-mark-deletion :after #'my-wgrep-mark-deletion-hack)
 
 ;; wgrep and rgrep, inspired by http://oremacs.com/2015/01/27/my-refactoring-workflow/
+;; The leading quote made this form dead code: `(define-key ...)' was
+;; treated as a quoted constant and the key binding was never installed.
 (with-eval-after-load 'wgrep
-  '(define-key grep-mode-map
-     (kbd "C-c C-c") 'wgrep-finish-edit))
+  (define-key grep-mode-map
+    (kbd "C-c C-c") 'wgrep-finish-edit))
 
 ;; {{ https://www.emacswiki.org/emacs/EmacsSession better than "desktop.el" or "savehist".
 ;; Any global variable matching `session-globals-regexp' is saved *automatically*.
