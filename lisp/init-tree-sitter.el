@@ -14,6 +14,9 @@ available."
   :type 'boolean
   :group 'python)
 
+(defvar my/python-treesit-installed nil
+  "Non-nil when the Python tree-sitter grammar is available.")
+
 (when (and (fboundp 'treesit-available-p)
            (treesit-available-p)
            (fboundp 'treesit-language-available-p)
