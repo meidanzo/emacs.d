@@ -687,8 +687,8 @@ Python 自带的 =venv= 模块已经足够，不再需要第三方 =virtualenv= 
 - =M-x my-python-create-venv= ：新建虚拟环境。
 - 打开 Python buffer 时，只会自动激活合法的项目 =.venv= （包含
   =pyvenv.cfg= ）；将 =my-python-auto-activate-venv= 设为 nil 可关闭此行为。
-- Python buffer 使用 Eglot，优先 =basedpyright-langserver=，其次
-  =pyright-langserver= 或 =pylsp=。
+- Python buffer 使用 Eglot，优先 =basedpyright-langserver= ，其次
+  =pyrefly= 、 =pyright-langserver= 或 =pylsp= 。
 - =ruff= 是 Apheleia 的 Python 格式化工具；Python buffer 已启用
   =apheleia-mode=，保存时会自动格式化。
 

@@ -26,6 +26,7 @@ available."
 (defun my-python-langserver-exist ()
   "Return an installed Python language server executable, or nil."
   (or (executable-find "basedpyright-langserver")
+      (executable-find "pyrefly")
       (executable-find "pyright-langserver")
       (executable-find "pylsp")))
 

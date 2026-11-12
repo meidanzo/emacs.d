@@ -689,7 +689,7 @@ uv is unavailable, =python3 -m venv= is used instead.
 - Valid project-local =.venv= directories (containing =pyvenv.cfg=) are
   activated automatically when a Python buffer is opened.  Set
   =my-python-auto-activate-venv= to nil to disable this.
-- Python buffers use Eglot with =basedpyright-langserver=,
+- Python buffers use Eglot with =basedpyright-langserver=, =pyrefly=,
   =pyright-langserver=, or =pylsp=, in that order of preference.
 - =ruff= is the Apheleia formatter; =apheleia-mode= is enabled for
   Python buffers, so saving formats with ruff.

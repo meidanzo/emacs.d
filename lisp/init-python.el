@@ -161,9 +161,10 @@ With prefix argument CREATE, create a new environment instead."
 
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
-               `((python-mode python-ts-mode)
+               `((python-ts-mode python-mode)
                  . ,(eglot-alternatives
                      '(("basedpyright-langserver" "--stdio")
+                       ("pyrefly" "lsp")
                        ("pyright-langserver" "--stdio")
                        "pylsp")))))
 
