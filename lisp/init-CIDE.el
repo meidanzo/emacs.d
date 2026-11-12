@@ -1,4 +1,4 @@
-;;; init-cpp-IDE.el --- personal C/C++ IDE setup  -*- lexical-binding: t; -*-
+;;; init-CIDE.el --- personal C/C++ IDE setup  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;; Personal customization, loaded by `require-init' from init.el exactly
 ;; like the other init-* parts.  The `t' flag passed to `require-init'
@@ -389,5 +389,5 @@ this command asks before that happens."
 ;; Configure C/C++ buffers that were already open when this file was loaded.
 (my-cpp-configure-existing-buffers)
 
-(provide 'init-cpp-IDE)
-;;; init-cpp-IDE.el ends here
+(provide 'init-CIDE)
+;;; init-CIDE.el ends here

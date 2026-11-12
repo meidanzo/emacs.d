@@ -150,7 +150,7 @@
 
   ;; C/C++ IDE: depends on init-utils (my-buffer-file-temp-p) and
   ;; init-evil (my-comma-leader-def), both loaded above.
-  (require-init 'init-cpp-IDE t)
+  (require-init 'init-CIDE t)
 
   ;; ediff configuration should be last so it can override
   ;; the key bindings in previous configuration
