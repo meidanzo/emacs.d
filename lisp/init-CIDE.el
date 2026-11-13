@@ -149,9 +149,20 @@ instead of adding a duplicate.")
   (dolist (marker my-cpp-project-markers)
     (add-to-list 'project-vc-extra-root-markers marker)))
 
+(defun my-cpp-vc-root ()
+  "Return the version-control root of `default-directory', or nil.
+Build files also live in subdirectories (CopyQ's `src/CMakeLists.txt',
+for example), so the nearest build-file marker is not always the
+project root.  The VC root is a reliable upper bound when one exists."
+  (ignore-errors
+    (when-let* ((backend (vc-responsible-backend default-directory)))
+      (file-name-as-directory
+       (vc-call-backend backend 'root default-directory)))))
+
 (defun my-cpp-project-root ()
   "Return the current C/C++ project root."
-  (or (let ((roots (delq nil
+  (or (my-cpp-vc-root)
+      (let ((roots (delq nil
                          (mapcar (lambda (marker)
                                    (locate-dominating-file default-directory marker))
                                  my-cpp-project-markers))))
@@ -161,10 +172,34 @@ instead of adding a duplicate.")
         (project-root project))
       default-directory))
 
+(defun my-cpp-cmake-declares-project-p (directory)
+  "Return non-nil when DIRECTORY's CMakeLists.txt declares a project.
+Subdirectory CMakeLists.txt files are normally fragments included with
+`add_subdirectory' and contain no `project' command."
+  (let ((file (expand-file-name "CMakeLists.txt" directory)))
+    (and (file-readable-p file)
+         (with-temp-buffer
+           (insert-file-contents file)
+           (re-search-forward
+            "^[ \t]*[Pp][Rr][Oo][Jj][Ee][Cc][Tt][ \t]*(" nil t)))))
+
 (defun my-cpp-cmake-root ()
-  "Return the nearest CMake project root, or the generic project root."
-  (or (locate-dominating-file default-directory "CMakeLists.txt")
-      (my-cpp-project-root)))
+  "Return the CMake project root, or the generic project root.
+Starting from the nearest CMakeLists.txt, keep climbing until one that
+calls `project' is found, so a subdirectory fragment is not configured
+as a standalone project."
+  (let ((directory (locate-dominating-file default-directory "CMakeLists.txt"))
+        root)
+    (while (and directory (not root))
+      (if (my-cpp-cmake-declares-project-p directory)
+          (setq root directory)
+        (let ((parent (file-name-directory
+                       (directory-file-name directory))))
+          (setq directory (unless (equal parent directory)
+                            (locate-dominating-file parent "CMakeLists.txt"))))))
+    (or root
+        (locate-dominating-file default-directory "CMakeLists.txt")
+        (my-cpp-project-root))))
 
 (defun my-cpp-detect-build-system (&optional root)
   "Detect a supported build system from project files under ROOT."
