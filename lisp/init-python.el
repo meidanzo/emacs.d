@@ -1,12 +1,36 @@
-;; -*- coding: utf-8; lexical-binding: t; -*-
+;;; init-python.el --- Python editing, venv, LSP, formatting -*- lexical-binding: t; -*-
+;;; Commentary:
+;; Python layer:
+;;   1. Project detection   non-git project markers for project.el
+;;   2. Indentation         disable `:' electric indent
+;;   3. Virtual envs        uv/python venv creation, selection, activation
+;;   4. Tree-sitter mode    python-mode -> python-ts-mode remap
+;;   5. LSP                 Eglot with basedpyright/pyrefly/pyright/pylsp
+;;   6. Formatting          apheleia + ruff
+;;; Code:
 
 (require 'project)
 (require 'seq)
 (require 'subr-x)
 
+(defconst my-python-mode-hooks '(python-mode-hook python-ts-mode-hook)
+  "Mode hooks for the two Python major modes.")
+
+;;; Project detection
+
+;; Make project.el recognize Python projects that are not under version
+;; control.  `my-python-auto-activate-venv' finds the project's .venv
+;; through `project-current', which returns nil in such directories
+;; without these markers.
+(with-eval-after-load 'project
+  (dolist (marker '("pyproject.toml" "setup.py" "setup.cfg"
+                    "requirements.txt" "Pipfile"))
+    (add-to-list 'project-vc-extra-root-markers marker)))
+
+;;; Indentation
+
 ;; `python-mode' adds `:' to `electric-indent-chars' buffer-locally, so a
 ;; global `setq' cannot remove it.  Do it in a hook instead.
-;; @see http://emacs.stackexchange.com/questions/3322/python-auto-indent-problem/3338#3338
 (defun my-python-disable-colon-electric-indent ()
   "Remove `:' from `electric-indent-chars' in this Python buffer."
   (unless (or (and (fboundp 'my-buffer-file-temp-p)
@@ -16,10 +40,11 @@
               (string= (file-name-extension buffer-file-name) "org"))
     (setq-local electric-indent-chars (delq ?: electric-indent-chars))))
 
-(dolist (hook '(python-mode-hook python-ts-mode-hook))
+(dolist (hook my-python-mode-hooks)
   (add-hook hook #'my-python-disable-colon-electric-indent))
 
-;; {{ Python virtual environment
+;;; Virtual environments
+
 ;; `pyvenv' activates environments inside Emacs.  Creation prefers `uv'
 ;; (https://docs.astral.sh/uv/) and falls back to Python's built-in
 ;; `venv' module.  The third-party `virtualenv' package is not required.
@@ -146,48 +171,63 @@ With prefix argument CREATE, create a new environment instead."
                    (equal (file-name-as-directory venv)
                           pyvenv-virtual-env))
         (my-activate-python-venv venv)))))
-;; }}
+
+;;; Tree-sitter mode
 
 ;; Prepend instead of `setq': replacing the whole alist would discard
 ;; remappings added by other packages or by the user.
-(when (treesit-language-available-p 'python)
+(when (and (fboundp 'treesit-available-p)
+           (treesit-available-p)
+           (treesit-language-available-p 'python))
   (setq major-mode-remap-alist
         (cons '(python-mode . python-ts-mode)
               (assq-delete-all 'python-mode major-mode-remap-alist))))
 
-;; Activate the project's .venv before starting the language server
-(add-hook 'python-mode-hook #'my-python-auto-activate-venv -90)
-(add-hook 'python-ts-mode-hook #'my-python-auto-activate-venv -90)
+;;; LSP
+
+;; Activate the project's .venv before starting the language server; the
+;; -90 depth keeps it ahead of `my-python-eglot-ensure'.
+(dolist (hook my-python-mode-hooks)
+  (add-hook hook #'my-python-auto-activate-venv -90))
 
 (with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               `((python-ts-mode python-mode)
-                 . ,(eglot-alternatives
-                     '(("basedpyright-langserver" "--stdio")
-                       ("pyrefly" "lsp")
-                       ("pyright-langserver" "--stdio")
-                       "pylsp")))))
+  ;; Replace Emacs' own `(python-mode python-ts-mode)' entry instead of
+  ;; `add-to-list', which would add a second key with the modes in a
+  ;; different order and leave the choice up to alist order.  `equal' is
+  ;; required because `alist-get' compares with `eq' by default and can
+  ;; never match a quoted literal list.
+  (setf (alist-get '(python-mode python-ts-mode)
+                   eglot-server-programs nil nil 'equal)
+        (eglot-alternatives
+         '(("basedpyright-langserver" "--stdio")
+           ("pyrefly" "lsp")
+           ("pyright-langserver" "--stdio")
+           "pylsp"))))
 
 (defun my-python-eglot-ensure ()
   "Start Eglot when a Python language server is installed."
   (when (my-python-langserver-exist)
     (eglot-ensure)))
 
-(add-hook 'python-mode-hook #'my-python-eglot-ensure)
-(add-hook 'python-ts-mode-hook #'my-python-eglot-ensure)
+(dolist (hook my-python-mode-hooks)
+  (add-hook hook #'my-python-eglot-ensure))
+
+;;; Formatting
 
 (defun my-python-enable-apheleia ()
   "Enable Apheleia formatting in the current Python buffer."
-  (when (fboundp 'apheleia-mode)
+  ;; apheleia's autoload file inlines `apheleia-mode', but the rest of the
+  ;; package (formatters, mode-alist) only exists after `require'.
+  (when (and (fboundp 'apheleia-mode)
+             (ignore-errors (require 'apheleia)))
     (apheleia-mode 1)))
 
-(dolist (hook '(python-mode-hook python-ts-mode-hook))
+(dolist (hook my-python-mode-hooks)
   (add-hook hook #'my-python-enable-apheleia))
 
 (with-eval-after-load 'apheleia
   (setf (alist-get 'python-mode apheleia-mode-alist) 'ruff
         (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff))
-
 
 (provide 'init-python)
 ;;; init-python.el ends here

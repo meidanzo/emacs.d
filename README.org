@@ -167,13 +167,14 @@ But there is a simple workaround:
 - Required by =org-mode= to export org file to odt file
 **** xsel or xclip
 - Required by my clipboard command =copy-to-x-clipboard= and =paste-from-x-clipboard= under Linux
-**** [[http://www.cmake.org][CMake]]
-- Required by =cpputils-cmake=
-- Please use [[https://gitlab.kitware.com/cmake/community/-/wikis/FAQ#out-of-source-build-trees][out-of-source build tree]] when using CMake
-**** [[http://clang.llvm.org][Clang]]
-- Required by =cpputils-cmake=, =company-clang= from [[https://github.com/company-mode/company-mode][company-mode]]
-- If you use =cpputils-cmake= and =cmake=, =cpputils-cmake= will do all the setup for you. You need not read next item! But please spend *a few minutes to learn the basics of cmake*! There is a one minute step-by-step-guide in [[https://github.com/redguardtoo/cpputils-cmake][README of cpputils-cmake]] to teach you how to use cmake.
-- If you use =company-clang=, add =(setq company-clang-arguments '("-I/example1/dir" "-I/example2/dir"))= into =init.el=
+**** C/C++ IDE
+- C/C++ semantic completion uses =clangd= and formatting uses =clang-format=. These are system executables, not Emacs Lisp packages.
+- =company-mode= is only the completion UI; C/C++ buffers use Eglot's =company-capf= first. =company-clang= is not enabled in those buffers, so it does not duplicate clangd completion.
+- Install the build tools used by each project: =cmake=, =make=, =meson=, =ninja=, or =xmake=. =bear= is also needed to capture a clangd compilation database for Make/Ninja projects. Projects also need their C/C++ compiler and system headers.
+- =M-x my-cpp-configure=, =M-x my-cpp-build=, and =M-x my-cpp-test= provide common entry points. CMake, Meson, and xmake use their standard commands; Make/Ninja projects use their project files. Set =my-cpp-build-system=, =my-cpp-debugger=, =my-cpp-project-test-command=, and =my-cpp-project-debug-command-line= in a project's =.dir-locals.el= to keep its own test command and debug arguments. You can also enter custom commands through =M-x my-cpp-run-build-command= and =M-x my-cpp-run-test-command=.
+- CMake, Meson, and xmake configuration export =compile_commands.json= for =clangd=. For Make/Ninja, run =M-x my-cpp-capture-compilation-database= to capture commands with Bear. CMake exports this database only with Makefile/Ninja generators; Bear may capture no commands from an up-to-date Ninja build.
+- Emacs 29 and later include Eglot, Tree-sitter, and GUD. This configuration already installs =company=, =google-c-style=, =treesit-auto=, and =apheleia=; no extra C/C++ completion or debugging package is required. To use LLDB, set =my-cpp-debugger= to =lldb= and make sure =lldb= is on =PATH=.
+- The C/C++ tree-sitter grammars are installed automatically on interactive startup when =clangd= is available and a grammar is missing; set =my-cpp-auto-install-treesit-grammar= to nil to disable this. You can also install them with =M-x treesit-install-language-grammar= for =c= and =cpp=. When a grammar is unavailable, Emacs falls back to =c-mode= / =c++-mode=. The default formatting style is Google with four-space indentation; a project's existing =.clang-format= takes precedence. Use =M-x my-cpp-write-clang-format= to write the project configuration.
 **** Pandoc
 - Required by =markdown-preview= from =markdown-mode=
 **** [[https://ctags.io/][Universal Ctags (recommended)]] or [[http://ctags.sourceforge.net][Exuberant CTags]]

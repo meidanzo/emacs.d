@@ -441,6 +441,26 @@ COUNT, BEG, END, TYPE is used.  If INCLUSIVE is t, the text object is inclusive.
 (define-key evil-inner-text-objects-map "i" #'my-evil-inner-single-or-double-quote)
 ;; }}
 
+;; {{ tree-sitter text objects (evil-textobj-tree-sitter)
+;; 键位避开已占用的文本对象键 (i v g f s o t r l / | = 等):
+;;   d -> function (defun), c -> class, a -> parameter
+;; 包很小, 直接加载以安装键位. 非 tree-sitter 模式下文本对象报
+;; "No ... text object found" 提示, 不影响其它功能.
+(when (require 'evil-textobj-tree-sitter nil t)
+  (define-key evil-outer-text-objects-map "d"
+    (evil-textobj-tree-sitter-get-textobj "function.outer"))
+  (define-key evil-inner-text-objects-map "d"
+    (evil-textobj-tree-sitter-get-textobj "function.inner"))
+  (define-key evil-outer-text-objects-map "c"
+    (evil-textobj-tree-sitter-get-textobj "class.outer"))
+  (define-key evil-inner-text-objects-map "c"
+    (evil-textobj-tree-sitter-get-textobj "class.inner"))
+  (define-key evil-outer-text-objects-map "a"
+    (evil-textobj-tree-sitter-get-textobj "parameter.outer"))
+  (define-key evil-inner-text-objects-map "a"
+    (evil-textobj-tree-sitter-get-textobj "parameter.inner")))
+;; }}
+
 ;; {{ use `,` as leader key
 (general-create-definer my-comma-leader-def
   :prefix ","

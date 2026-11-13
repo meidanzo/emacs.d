@@ -1,4 +1,4 @@
-personal_ws-1.1 en 363
+personal_ws-1.1 en 369
 acodec
 adoc
 aider
@@ -362,3 +362,9 @@ Ast
 sg
 Apheleia
 Eglot
+clangd
+xmake
+GUD
+LLDB
+executables
+Eglot's

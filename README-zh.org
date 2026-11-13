@@ -169,13 +169,14 @@
 - =org-mode= 将 org 文件导出为 odt 文件时需要它
 **** xsel 或 xclip
 - Linux 下我的剪贴板命令 =copy-to-x-clipboard= 和 =paste-from-x-clipboard= 需要它
-**** [[http://www.cmake.org][CMake]]
-- =cpputils-cmake= 需要它
-- 使用 CMake 时请使用[[https://gitlab.kitware.com/cmake/community/-/wikis/FAQ#out-of-source-build-trees][源外构建目录（out-of-source build tree）]]
-**** [[http://clang.llvm.org][Clang]]
-- =cpputils-cmake= 以及 [[https://github.com/company-mode/company-mode][company-mode]] 的 =company-clang= 需要它
-- 如果你使用 =cpputils-cmake= 和 =cmake= ， =cpputils-cmake= 会为你完成所有配置。你无需阅读下一条！但请花 *几分钟学习 cmake 基础知识* ！[[https://github.com/redguardtoo/cpputils-cmake][cpputils-cmake 的 README]] 中有一份一分钟的分步指南，教你如何使用 cmake。
-- 如果你使用 =company-clang= ，请将 =(setq company-clang-arguments '("-I/example1/dir" "-I/example2/dir"))= 加入 =init.el=
+**** C/C++ IDE
+- C/C++ 语义补全使用 =clangd=，格式化使用 =clang-format=。它们是系统程序，不是 Emacs Lisp 包。
+- =company-mode= 只是补全界面，C/C++ 缓冲区优先使用 Eglot 的 =company-capf=；不会同时启用 =company-clang=，因此不会和 clangd 重复补全。
+- 按项目安装需要的构建工具：=cmake=、=make=、=meson=、=ninja= 或 =xmake=；使用 Make/Ninja 生成 clangd 编译数据库时还需要 =bear=。项目也需要相应的 C/C++ 编译器和头文件。
+- =M-x my-cpp-configure=、=M-x my-cpp-build= 和 =M-x my-cpp-test= 提供统一入口。CMake、Meson、xmake 会使用其标准命令；Make/Ninja 项目使用 Makefile/Ninja 文件。可在项目的 =.dir-locals.el= 中设置 =my-cpp-build-system=、=my-cpp-debugger=、=my-cpp-project-test-command= 和 =my-cpp-project-debug-command-line=，保留项目自己的测试命令和调试参数；也可直接运行 =M-x my-cpp-run-build-command= 或 =M-x my-cpp-run-test-command= 输入命令。
+- CMake、Meson、xmake 配置会为 =clangd= 导出 =compile_commands.json=；Make/Ninja 项目可运行 =M-x my-cpp-capture-compilation-database= 并用 Bear 捕获。CMake 只有 Makefile/Ninja 生成器支持该数据库导出；Ninja 增量构建若没有触发编译，Bear 可能捕获不到命令。
+- Emacs 29 及以上内置 Eglot、Tree-sitter 和 GUD。当前配置已安装 =company=、=google-c-style=、=treesit-auto= 和 =apheleia=；不需要额外的 C/C++ 补全或调试插件。需要 LLDB 时，将 =my-cpp-debugger= 设为 =lldb=，并确保 =lldb= 在 =PATH= 中。
+- 当 =clangd= 已安装且语法库缺失时，交互式启动 Emacs 会自动安装 C/C++ 的 tree-sitter 语法库；将 =my-cpp-auto-install-treesit-grammar= 设为 nil 可关闭。也可分别运行 =M-x treesit-install-language-grammar= 并输入 =c=、=cpp= 手动安装；没有语法库时自动退回 =c-mode= / =c++-mode=。格式默认采用 Google 风格、4 空格缩进；已有项目的 =.clang-format= 会优先生效，也可用 =M-x my-cpp-write-clang-format= 写入项目配置。
 **** Pandoc
 - =markdown-mode= 的 =markdown-preview= 需要它
 **** [[https://ctags.io/][Universal Ctags（推荐）]] 或 [[http://ctags.sourceforge.net][Exuberant CTags]]

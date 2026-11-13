@@ -77,6 +77,7 @@
     typescript-mode ; the stable version lacks important feature (highlight function names)
     evil-exchange
     evil-find-char-pinyin
+    evil-textobj-tree-sitter ;; melpa-only: tree-sitter 文本对象
     evil-snipe
     evil-easymotion
     ;; {{ dependencies of stable realgud are too old
@@ -122,6 +123,7 @@
     graphql-mode
     company-prescient
     google-c-style
+    treesit-auto
     auctex
     auctex-cont-latexmk
     auctex-label-numbers
@@ -303,6 +305,7 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'native-complete)
 (require-package 'company-prescient)
 (require-package 'google-c-style)
+(require-package 'treesit-auto)
 (require-package 'pyvenv)
 (require-package 'legalese)
 (require-package 'simple-httpd)
@@ -316,6 +319,7 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
 (require-package 'evil-escape)
 (require-package 'evil-exchange)
 (require-package 'evil-find-char-pinyin)
+(require-package 'evil-textobj-tree-sitter) ;; tree-sitter 文本对象 (vaf/vac 等)
 (require-package 'evil-matchit)
 (require-package 'evil-nerd-commenter)
 (require-package 'evil-surround)

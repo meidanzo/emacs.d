@@ -1,54 +1,39 @@
-;; -*- coding: utf-8; lexical-binding: t; -*-
+;;; init-cc-mode.el --- C/C++/CMake editing setup -*- lexical-binding: t; -*-
+;;; Commentary:
+;; Editing-level setup for C/C++/CMake buffers:
+;;   1. C/C++ (cc-mode)     Google style, 4-space indent, GDB window layout
+;;   2. C/C++ (tree-sitter) same 4-space indent for c-ts-mode/c++-ts-mode
+;;   3. CMake                imenu index for both cmake-mode and cmake-ts-mode
+;;; Code:
 
-;; Tip 1: use more popular style "linux" instead of "gnu",
-;;
-;;   (setq c-default-style '((java-mode . "java")
-;;                           (awk-mode . "awk")
-;;                           (other . "linux")))
-
-;; Tip 2: Search my article "C/C++/Java code indentation in Emacs"
-;; My code might be obsolete, but the knowledge is still valid.
-;;
-;; C code example:
-;;   if(1) // press ENTER here, zero means no indentation
-;;   void fn() // press ENTER here, zero means no indentation
 (require 'google-c-style)
+
+;;; C/C++: cc-mode
 
 (defun my-common-cc-mode-setup ()
   "Setup shared by all languages (java/groovy/c++ ...)."
-
-  ;make DEL take all previous whitespace with it
+  ;; Make DEL take all previous whitespace with it.
   (c-toggle-auto-hungry-state 1)
-
-  ;; give me NO newline automatically after electric expressions are entered
-  ;;默认设置:https://blog.csdn.net/nuaa_meteor/article/details/76653271
+  ;; No automatic newline after electric expressions are entered.
   (setq c-auto-newline nil))
 
 (defun my-c-mode-setup ()
   "C/C++ only setup."
-  ;; @see http://stackoverflow.com/questions/3509919/ \
-  ;; emacs-c-opening-corresponding-header-file
-  ;; Use `ff-find-other-file' to open C/C++ header
+  ;; Directories searched by `ff-find-other-file' for headers.
+  (setq cc-search-directories
+        '("." "/usr/include" "/usr/local/include/*" "../*/include" "$WXWIN/include"))
 
-  (setq cc-search-directories '("." "/usr/include" "/usr/local/include/*" "../*/include" "$WXWIN/include"))
+  ;; Browse Emacs' C code.
+  (push '(nil "^DEFUN *(\"\\([a-zA-Z0-9-]+\\)" 1) imenu-generic-expression)
 
-  ;; In theory, you can write your own Makefile for `flymake-mode' without cmake.
-  ;; Nobody actually does it in real world.
-
-  ;; Browse Emacs' C code
-  (push '(nil "^DEFUN *(\"\\([a-zA-Z0-9-]+\\)" 1) imenu-generic-expression )
-
-  ;; make a #define be left-aligned
+  ;; Make a #define be left-aligned.
   (setq c-electric-pound-behavior (quote (alignleft)))
 
-  ;; google-style设置
+  ;; Google style with a four-space indent (Google defaults to 2).
   (google-set-c-style)
   (google-make-newline-indent)
-  (setq c-basic-offset 4)
-
-  ;;多个缓冲区进行gdb，@see http://tuhdo.github.io/c-ide.html
-  (setq gdb-many-windows t  ;; use gdb-many-windows by default
-        gdb-show-main t))    ;; Non-nil means display source file containing the main routine at startup
+  (setq c-basic-offset 4
+        indent-tabs-mode nil))
 
 (defun c-mode-common-hook-setup ()
   "C/C++ setup."
@@ -58,14 +43,30 @@
       (my-c-mode-setup))))
 (add-hook 'c-mode-common-hook 'c-mode-common-hook-setup)
 
+;;; C/C++: tree-sitter modes
+
+(defun my-c-ts-mode-setup ()
+  "Use four-space indentation in tree-sitter C/C++ modes."
+  (setq-local c-ts-mode-indent-offset 4
+              indent-tabs-mode nil))
+(add-hook 'c-ts-mode-hook #'my-c-ts-mode-setup)
+(add-hook 'c++-ts-mode-hook #'my-c-ts-mode-setup)
+
+;;; CMake
+
 (defun my/cmake-mode-imenu-setup ()
-  "Imenu setup for `cmake-mode'."
-  (setq imenu-generic-expression
-        '(("Functions" "^\\s-*function\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1)
-          ("Macros"    "^\\s-*macro\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1)
-          ("Targets"   "^\\s-*add_\\(?:executable\\|library\\)\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1)
-          ("Options"   "^\\s-*option\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1))))
+  "Imenu setup for `cmake-mode' and `cmake-ts-mode'.
+cmake-ts-mode has no built-in imenu rules, so the same regex-based
+index is installed for both modes.  Use `setq-local' so the value
+stays in the buffer instead of clobbering the global default."
+  (setq-local imenu-generic-expression
+              '(("Functions" "^\\s-*function\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1)
+                ("Macros"    "^\\s-*macro\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1)
+                ("Targets"   "^\\s-*add_\\(?:executable\\|library\\)\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1)
+                ("Options"   "^\\s-*option\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1))))
 
 (add-hook 'cmake-mode-hook #'my/cmake-mode-imenu-setup)
+(add-hook 'cmake-ts-mode-hook #'my/cmake-mode-imenu-setup)
+
 (provide 'init-cc-mode)
 ;;; init-cc-mode.el ends here
