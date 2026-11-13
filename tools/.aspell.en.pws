@@ -1,4 +1,4 @@
-personal_ws-1.1 en 370
+personal_ws-1.1 en 371
 acodec
 adoc
 aider
@@ -359,6 +359,7 @@ zipf
 zsh
 bibtex
 im
+langserver
 latexmk
 Ast
 sg

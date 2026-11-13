@@ -150,6 +150,11 @@
   ;; init-evil (my-comma-leader-def), both loaded above.
   (require-init 'init-CIDE t)
 
+  ;; Rust IDE: depends on init-tree-sitter (my-rust-langserver-exist and
+  ;; the rust grammar auto-install), init-utils and init-evil, all loaded
+  ;; above.
+  (require-init 'init-rust t)
+
   ;; ediff configuration should be last so it can override
   ;; the key bindings in previous configuration
   (when my-lightweight-mode-p

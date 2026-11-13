@@ -3,9 +3,10 @@
 ;; Three jobs, in one place:
 ;;   1. Tell Emacs where grammar shared libraries live.
 ;;   2. Maintain grammar recipes and auto-install missing ones at startup
-;;      (interactive sessions only; C/C++ and Python grammars require
-;;      their matching language server, while CMake grammar is independent).
-;;   3. Switch c/c++/python buffers to their tree-sitter modes via
+;;      (interactive sessions only; C/C++, Python, and Rust grammars
+;;      require their matching language server, while the CMake grammar
+;;      is independent).
+;;   3. Switch c/c++/python/rust buffers to their tree-sitter modes via
 ;;      treesit-auto when the grammars are available.
 ;;; Code:
 
@@ -27,7 +28,8 @@
     ;; tree-sitter-cmake's master branch still vendors an old parser.h, so
     ;; it compiles against both ABI 14 and newer runtimes.
     (cmake  "https://github.com/uyha/tree-sitter-cmake"         "master"  my-cmake-langserver-exist)
-    (python "https://github.com/tree-sitter/tree-sitter-python" "v0.23.6" my-python-langserver-exist))
+    (python "https://github.com/tree-sitter/tree-sitter-python" "v0.23.6" my-python-langserver-exist)
+    (rust   "https://github.com/tree-sitter/tree-sitter-rust"   "v0.23.2" my-rust-langserver-exist))
   "Grammar specs for the languages this configuration uses.
 See `my-treesit-auto-install-grammars'.")
 
@@ -68,6 +70,11 @@ Also used by `my-python-eglot-ensure' in init-python.el."
   "Return an installed CMake language server executable, or nil."
   (or (executable-find "neocmakelsp")
       (executable-find "cmake-language-server")))
+
+(defun my-rust-langserver-exist ()
+  "Return an installed Rust language server executable, or nil.
+Also used by `my-rust-eglot-ensure' in init-rust.el."
+  (executable-find "rust-analyzer"))
 
 ;;; Grammar installation.
 (defcustom my-treesit-auto-install-grammars t
