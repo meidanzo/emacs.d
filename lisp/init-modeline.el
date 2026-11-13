@@ -116,6 +116,25 @@ the second character is the work-tree status."
   (advice-add 'doom-modeline-update-vcs :after
               #'my-doom-modeline-vcs-icon-color))
 
+;; ---------------------------------------------------------------------------
+;; VCS 分支名
+;;
+;; Emacs 29+ 的 `vc-mode' 格式为 BACKEND + 状态指示符 + revision，其中指示符有
+;; `-'（up-to-date）、`:'（edited）、`@'（added）、`!'（conflict/removed/ignored）
+;; 和 `?'（missing）。
+;; doom-modeline 默认的 `doom-modeline-vcs-name' 只认 `-' 和 `:'，在 `added'
+;; 等状态下提取不到分支名，VCS segment 只剩下图标（例如 `git add' 之后）。
+;; ---------------------------------------------------------------------------
+
+(defun my-doom-modeline-vcs-name ()
+  "Display the VCS branch name, handling all `vc-mode' state indicators."
+  (and vc-mode
+       (cadr (split-string (string-trim vc-mode)
+                           "^[A-Za-z]+[-:@!?]+"))))
+
+(with-eval-after-load 'doom-modeline
+  (setq doom-modeline-vcs-display-function #'my-doom-modeline-vcs-name))
+
 (defvar my-extra-mode-line-info '()
   "Extra info displayed at the end of the mode line.")
 
