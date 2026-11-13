@@ -1,4 +1,4 @@
-personal_ws-1.1 en 369
+personal_ws-1.1 en 371
 acodec
 adoc
 aider
@@ -10,6 +10,7 @@ args
 ascii
 asciidoc
 aspell
+ast
 async
 auth
 autoload
@@ -148,6 +149,7 @@ imenu
 impl
 importmagic
 init
+interop
 isearch
 ispell
 javascript
@@ -271,6 +273,7 @@ savehist
 scss
 sdcv
 setq
+sg
 sgml
 shellcop
 shimgvw
@@ -354,7 +357,6 @@ zcat
 zh
 zipf
 zsh
-WSLInterop
 bibtex
 im
 latexmk
@@ -368,3 +370,9 @@ GUD
 LLDB
 executables
 Eglot's
+||||||| b84c8ac5
+zsh
+WSLInterop
+=======
+zsh
+>>>>>>> redguardtoo
