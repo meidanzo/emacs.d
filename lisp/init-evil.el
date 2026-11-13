@@ -447,6 +447,11 @@ COUNT, BEG, END, TYPE is used.  If INCLUSIVE is t, the text object is inclusive.
 ;; 包很小, 直接加载以安装键位. 非 tree-sitter 模式下文本对象报
 ;; "No ... text object found" 提示, 不影响其它功能.
 (when (require 'evil-textobj-tree-sitter nil t)
+  ;; Do not fall back to the next match when point is outside every capture.
+  ;; In macro-heavy headers (Qt's Q_QML_EXPORT, QT_BEGIN_NAMESPACE) the
+  ;; tree-sitter parse has no class_specifier for the class at point, and the
+  ;; fallback would silently select a distant enum instead; fail loudly.
+  (setq evil-textobj-tree-sitter-use-next-if-not-within nil)
   (define-key evil-outer-text-objects-map "d"
     (evil-textobj-tree-sitter-get-textobj "function.outer"))
   (define-key evil-inner-text-objects-map "d"
