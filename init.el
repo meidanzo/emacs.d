@@ -181,10 +181,6 @@
            gcs-done))
 (add-hook 'after-init-hook #'my-report-startup-time)
 
->>>>>>> redguardtoo
-;;; Local Variables:
-;;; no-byte-compile: t
-;;; End:
 (put 'erase-buffer 'disabled nil)
 
 ;; 解决中英文混排的时候折行错误
@@ -204,4 +200,6 @@
            (not (bound-and-true-p keyfreq-autosave-mode))
            (fboundp 'turnon-keyfreq-mode))
   (turnon-keyfreq-mode))
-;;; init.el ends here
+;;; Local Variables:
+;;; no-byte-compile: t
+;;; End:
