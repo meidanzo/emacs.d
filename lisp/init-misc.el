@@ -579,7 +579,12 @@ This function can be re-used by other major modes after compilation."
 
 (with-eval-after-load 'compile
   ;; @see http://xugx2007.blogspot.com.au/2007/06/benjamin-rutts-emacs-c-development-tips.html
-  (setq compilation-finish-functions '(my-compilation-finish-hide-buffer-on-success)))
+  ;; `add-hook', not `setq': `compile' is loaded lazily, after the other
+  ;; init files, and replacing the whole hook would drop the finish
+  ;; callbacks registered by them (init-CIDE.el links and checks the
+  ;; compilation database after a successful CMake/Meson configure).
+  (add-hook 'compilation-finish-functions
+            #'my-compilation-finish-hide-buffer-on-success))
 ;; }}
 
 (defun my-switch-to-builtin-shell ()

@@ -45,16 +45,63 @@
 (defconst my-python-mode-hooks '(python-mode-hook python-ts-mode-hook)
   "Mode hooks for the two Python major modes.")
 
+;; User-installed tools such as Ruff and basedpyright commonly live in
+;; ~/.local/bin, which desktop Emacs may not inherit from the shell.
+(defun my-python-add-local-bin-to-path ()
+  "Add the user's ~/.local/bin to `exec-path' and PATH when it exists."
+  (let* ((directory (expand-file-name "~/.local/bin"))
+         (separator (if (characterp path-separator)
+                        (char-to-string path-separator)
+                      path-separator))
+         (path (or (getenv "PATH") "")))
+    (when (file-directory-p directory)
+      ;; Append so an activated project venv remains ahead of user tools.
+      (add-to-list 'exec-path directory t)
+      (unless (member directory (split-string path (regexp-quote separator) t))
+        (setenv "PATH" (if (string-empty-p path)
+                           directory
+                         (concat path separator directory)))))))
+
+(my-python-add-local-bin-to-path)
+(dolist (hook my-python-mode-hooks)
+  ;; Reapply when opening Python after init-essential imports shell PATH.
+  (add-hook hook #'my-python-add-local-bin-to-path -100))
+
 ;;; Project detection
+
+(defconst my-python-project-markers
+  '("pyproject.toml" "setup.py" "setup.cfg" "requirements.txt" "Pipfile")
+  "Files that identify a Python project root.")
 
 ;; Make project.el recognize Python projects that are not under version
 ;; control.  `my-python-auto-activate-venv' finds the project's .venv
 ;; through `project-current', which returns nil in such directories
 ;; without these markers.
+;;
+;; The markers are deliberately NOT added to
+;; `project-vc-extra-root-markers': Emacs 30's `project-try-vc--search'
+;; lets the marker nearest to the buffer win over the version-control
+;; root, so a nested `requirements.txt' or `pyproject.toml' would re-root
+;; a version-controlled buffer inside its own subdirectory, hiding the
+;; repository root and its .venv from `project-current'.  A find function
+;; that only fires without a VC backend keeps the original non-VC use
+;; case.
+(defun my-python-project-try-local (directory)
+  "Recognize a Python project by its files when no VC root exists.
+Return a transient project rooted at the outermost marker below
+DIRECTORY, or nil when DIRECTORY is under version control."
+  (unless (ignore-errors (vc-responsible-backend directory))
+    (let ((roots (delq nil
+                       (mapcar (lambda (marker)
+                                 (locate-dominating-file directory marker))
+                               my-python-project-markers))))
+      (when roots
+        (cons 'transient
+              (car (sort roots (lambda (left right)
+                                 (> (length left) (length right))))))))))
+
 (with-eval-after-load 'project
-  (dolist (marker '("pyproject.toml" "setup.py" "setup.cfg"
-                    "requirements.txt" "Pipfile"))
-    (add-to-list 'project-vc-extra-root-markers marker)))
+  (add-hook 'project-find-functions #'my-python-project-try-local t))
 
 ;;; Indentation
 
@@ -332,7 +379,7 @@ This is the Python implementation behind the shared `,nf' format key
 bound by init-ide.el."
   (interactive)
   (if (fboundp 'apheleia-format-buffer)
-      (apheleia-format-buffer)
+      (call-interactively #'apheleia-format-buffer)
     (user-error "apheleia is not available; cannot format the buffer")))
 
 (defun my-python-test (&optional args)
@@ -449,9 +496,10 @@ the default.  This is the Python implementation behind the shared
 ;;; Shared operations
 
 ;; Register the Python implementations behind init-ide.el's shared ","
-;; "n" keys: ,nt test, ,nd debug, ,nl lint, ,nf format.  init-ide.el
-;; loads after this file, hence `with-eval-after-load'.
+;; "n" keys: ,nb syntax-check, ,nt test, ,nd debug, ,nl lint, ,nf format.
+;; init-ide.el loads after this file, hence `with-eval-after-load'.
 (with-eval-after-load 'init-ide
+  (my-ide-register 'build my-python-modes #'my-python-check)
   (my-ide-register 'test my-python-modes #'my-python-test)
   (my-ide-register 'debug my-python-modes #'my-python-debug)
   (my-ide-register 'lint my-python-modes #'my-python-lint)

@@ -160,9 +160,31 @@ instead of adding a duplicate.")
 ;; other project.el users need the same detection: without it,
 ;; `project-current' returns nil in such directories and Eglot falls back
 ;; to a transient project rooted at the source file's directory.
+;;
+;; The markers are deliberately NOT added to
+;; `project-vc-extra-root-markers': Emacs 30's `project-try-vc--search'
+;; lets the marker nearest to the buffer win over the version-control
+;; root, so a subdirectory build file (blanket's `blanket/meson.build',
+;; CopyQ's `src/CMakeLists.txt') would re-root a buffer inside that
+;; subdirectory, hiding the real project root and the compilation
+;; database from Eglot.  A find function that only fires without a VC
+;; backend keeps the original non-VC use case.
+(defun my-cpp-project-try-local (directory)
+  "Recognize a C/C++ project by its build files when no VC root exists.
+Return a transient project rooted at the outermost build-file marker
+below DIRECTORY, or nil when DIRECTORY is under version control."
+  (unless (ignore-errors (vc-responsible-backend directory))
+    (let ((roots (delq nil
+                       (mapcar (lambda (marker)
+                                 (locate-dominating-file directory marker))
+                               my-cpp-project-markers))))
+      (when roots
+        (cons 'transient
+              (car (sort roots (lambda (left right)
+                                 (> (length left) (length right))))))))))
+
 (with-eval-after-load 'project
-  (dolist (marker my-cpp-project-markers)
-    (add-to-list 'project-vc-extra-root-markers marker)))
+  (add-hook 'project-find-functions #'my-cpp-project-try-local t))
 
 (defun my-cpp-vc-root ()
   "Return the version-control root of `default-directory', or nil.
@@ -175,17 +197,23 @@ project root.  The VC root is a reliable upper bound when one exists."
        (vc-call-backend backend 'root default-directory)))))
 
 (defun my-cpp-project-root ()
-  "Return the current C/C++ project root."
-  (or (my-cpp-vc-root)
-      (let ((roots (delq nil
-                         (mapcar (lambda (marker)
-                                   (locate-dominating-file default-directory marker))
-                                 my-cpp-project-markers))))
-        (car (sort roots (lambda (left right)
-                           (> (length left) (length right))))))
-      (when-let* ((project (project-current)))
-        (project-root project))
-      default-directory))
+  "Return the current C/C++ project root.
+The result is always expanded: `locate-dominating-file' abbreviates
+paths under the home directory with a literal `~', which
+`shell-quote-argument' would then escape, breaking the shell commands
+that embed the root."
+  (file-name-as-directory
+   (expand-file-name
+    (or (my-cpp-vc-root)
+        (let ((roots (delq nil
+                           (mapcar (lambda (marker)
+                                     (locate-dominating-file default-directory marker))
+                                   my-cpp-project-markers))))
+          (car (sort roots (lambda (left right)
+                             (> (length left) (length right))))))
+        (when-let* ((project (project-current)))
+          (project-root project))
+        default-directory))))
 
 (defun my-cpp-cmake-declares-project-p (directory)
   "Return non-nil when DIRECTORY's CMakeLists.txt declares a project.
@@ -212,9 +240,10 @@ as a standalone project."
                        (directory-file-name directory))))
           (setq directory (unless (equal parent directory)
                             (locate-dominating-file parent "CMakeLists.txt"))))))
-    (or root
-        (locate-dominating-file default-directory "CMakeLists.txt")
-        (my-cpp-project-root))))
+    (or (when root (expand-file-name root))
+        (expand-file-name
+         (or (locate-dominating-file default-directory "CMakeLists.txt")
+             (my-cpp-project-root))))))
 
 (defun my-cpp-detect-build-system (&optional root)
   "Detect a supported build system from project files under ROOT."
@@ -282,21 +311,22 @@ AFTER-SUCCESS is a callback list: (FUNCTION ARG...)."
 
 (defun my-cpp-cmake-build-directory (&optional choose)
   "Find a CMake build directory, prompting when it is ambiguous or absent.
-When CHOOSE is non-nil, prompt even if one cached build directory exists."
+When CHOOSE is non-nil, prompt even if one cached build directory exists.
+The result is always an expanded path (see `my-cpp-project-root')."
   (let* ((root (file-name-as-directory (my-cpp-cmake-root)))
          (candidates (my-cpp-cmake-build-candidates root)))
-    (cond
-     ((and (= (length candidates) 1) (not choose))
-      (car candidates))
-     ((> (length candidates) 1)
-      (expand-file-name
-       (completing-read "CMake build directory: " candidates nil t)
-       root))
-     (t
-      (read-directory-name
-       "CMake build directory: " root
-       (or (car candidates)
-           (expand-file-name my-cpp-build-directory root)) nil)))))
+    (expand-file-name
+     (cond
+      ((and (= (length candidates) 1) (not choose))
+       (car candidates))
+      ((> (length candidates) 1)
+       (completing-read "CMake build directory: " candidates nil t))
+      (t
+       (read-directory-name
+        "CMake build directory: " root
+        (or (car candidates)
+            (expand-file-name my-cpp-build-directory root)) nil)))
+     root)))
 
 (defun my-cpp-after-cmake-configure (root build-directory)
   "Link and inspect the compilation database after CMake succeeds."
@@ -361,20 +391,21 @@ When CHOOSE is non-nil, prompt even if one cached build directory exists."
 
 (defun my-cpp-meson-build-directory (&optional choose)
   "Find a configured Meson build directory, prompting if needed.
-When CHOOSE is non-nil, prompt even if exactly one build directory exists."
+When CHOOSE is non-nil, prompt even if exactly one build directory exists.
+The result is always an expanded path (see `my-cpp-project-root')."
   (let* ((root (file-name-as-directory (my-cpp-project-root)))
          (candidates (my-cpp-meson-build-candidates root)))
-    (cond
-     ((and (= (length candidates) 1) (not choose))
-      (car candidates))
-     ((> (length candidates) 1)
-      (expand-file-name
-       (completing-read "Meson build directory: " candidates nil t)
-       root))
-     (t
-      (read-directory-name
-       "Meson build directory: " root
-       (or (car candidates) (expand-file-name my-cpp-build-directory root)) nil)))))
+    (expand-file-name
+     (cond
+      ((and (= (length candidates) 1) (not choose))
+       (car candidates))
+      ((> (length candidates) 1)
+       (completing-read "Meson build directory: " candidates nil t))
+      (t
+       (read-directory-name
+        "Meson build directory: " root
+        (or (car candidates) (expand-file-name my-cpp-build-directory root)) nil)))
+     root)))
 
 (defun my-cpp-after-meson-setup (root build-directory)
   "Expose Meson's compilation database after setup succeeds."
@@ -474,7 +505,8 @@ When CHOOSE is non-nil, prompt even if exactly one build directory exists."
   (my-cpp-compile-at (my-cpp-project-root) my-cpp-make-command))
 
 (defun my-cpp-ninja-build-directory (&optional choose)
-  "Find a Ninja build directory, prompting if it is ambiguous or absent."
+  "Find a Ninja build directory, prompting if it is ambiguous or absent.
+The result is always an expanded path (see `my-cpp-project-root')."
   (let* ((root (file-name-as-directory (my-cpp-project-root)))
          (candidates
           (delete-dups
@@ -485,17 +517,17 @@ When CHOOSE is non-nil, prompt even if exactly one build directory exists."
                   (mapcar #'file-name-directory
                           (file-expand-wildcards
                            (expand-file-name "*/build.ninja" root))))))))
-    (cond
-     ((and (= (length candidates) 1) (not choose))
-      (car candidates))
-     ((> (length candidates) 1)
-      (expand-file-name
-       (completing-read "Ninja build directory: " candidates nil t)
-       root))
-     (t
-      (read-directory-name
-       "Ninja build directory: " root
-       (expand-file-name my-cpp-build-directory root) nil)))))
+    (expand-file-name
+     (cond
+      ((and (= (length candidates) 1) (not choose))
+       (car candidates))
+      ((> (length candidates) 1)
+       (completing-read "Ninja build directory: " candidates nil t))
+      (t
+       (read-directory-name
+        "Ninja build directory: " root
+        (expand-file-name my-cpp-build-directory root) nil)))
+     root)))
 
 (defun my-cpp-ninja-build ()
   "Build the project with Ninja."
@@ -872,7 +904,7 @@ This is the C/C++ implementation behind the shared `,nf' format key
 bound by init-ide.el."
   (interactive)
   (if (fboundp 'apheleia-format-buffer)
-      (apheleia-format-buffer)
+      (call-interactively #'apheleia-format-buffer)
     (user-error "apheleia is not available; cannot format the buffer")))
 
 ;;; Static analysis
