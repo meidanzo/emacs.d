@@ -914,8 +914,27 @@ buffer."
 ;; pressed with the left pinky across the hand from the comma.  The
 ;; shared operations live under "," "n" in init-ide.el.  All
 ;; lowercase; ,zj is j for the JSON compilation database.
+;;
+;; The keys are scoped to the C/C++ and CMake mode maps, so this
+;; language layer exists only in language buffers; the global ","
+;; keys stay available there through keymap fallback.  CMake buffers
+;; are included so the project commands work from a CMakeLists.txt
+;; buffer.
+(defconst my-cpp-keymaps
+  '(c-mode-map c++-mode-map objc-mode-map
+    c-ts-mode-map c++-ts-mode-map
+    cmake-mode-map cmake-ts-mode-map)
+  "Mode maps where the C/C++-specific ',' 'z' keys are active.")
+
+;; The mode maps exist only after their libraries load (all built in).
+(ignore-errors (require 'c-ts-mode))
+(ignore-errors (require 'c++-ts-mode))
+(ignore-errors (require 'cmake-mode))
+(ignore-errors (require 'cmake-ts-mode))
+
 (with-eval-after-load 'evil
   (my-comma-leader-def
+    :keymaps my-cpp-keymaps
     "zc" #'my-cpp-configure
     "zb" #'my-cpp-run-build-command
     "ze" #'my-cpp-run-test-command

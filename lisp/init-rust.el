@@ -375,8 +375,20 @@ starts in target/debug/ when that directory exists."
 ;; the shared operations (build/test/debug/lint/format) are bound
 ;; under "," "n" by init-ide.el.  The former ",tr" cleanup-buffer-safe
 ;; key moved to ",br" in init-evil.el to free this prefix.
+;;
+;; The keys are scoped to the Rust mode maps, so this language layer
+;; exists only in Rust buffers; the global "," keys stay available
+;; there through keymap fallback.
+(defconst my-rust-keymaps '(rust-ts-mode-map rust-mode-map)
+  "Mode maps where the cargo-specific ',' 't' keys are active.")
+
+;; The mode maps exist only after their libraries load.
+(ignore-errors (require 'rust-ts-mode))
+(ignore-errors (require 'rust-mode))
+
 (with-eval-after-load 'evil
   (my-comma-leader-def
+    :keymaps my-rust-keymaps
     "tr" #'my-rust-cargo-run
     "tc" #'my-rust-cargo-check
     "tu" #'my-rust-cargo-update

@@ -142,8 +142,9 @@ Used by the interactive shared commands below."
 ;;; Keybindings
 
 ;; The shared operations dispatch on the current buffer's language.
-;; All keys are lowercase; the language-specific keys under the "," "z"
-;; (C/C++) and "," "t" (Rust) prefixes are lowercase too.
+;; These keys stay global (usable in every buffer); the
+;; language-specific layers are bound in their mode maps only: "," "z"
+;; for C/C++ (init-CIDE.el) and "," "t" for Rust (init-rust.el).
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "nb" #'my-ide-build
