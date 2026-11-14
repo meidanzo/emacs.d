@@ -129,11 +129,52 @@ Used by the interactive shared commands below."
 (defun my-ide-eglot-capf-first ()
   "Put the server's completion-at-point function before fallback sources."
   (when (fboundp 'eglot-completion-at-point)
-    (setq-local completion-at-point-functions
-                (cons #'eglot-completion-at-point
-                      (remove #'eglot-completion-at-point
-                              completion-at-point-functions)))))
+    ;; completion-at-point-functions is a hook variable: its
+    ;; buffer-local value ends with the hook's t marker (meaning "run
+    ;; the global hook members after the local ones").  Rebuilding the
+    ;; list by hand with setq-local can duplicate or misplace members
+    ;; and must special-case the marker, so use add-hook with a
+    ;; negative depth instead; it conses the function onto the front
+    ;; of the local hook and keeps the hook structure intact.
+    (add-hook 'completion-at-point-functions
+              #'eglot-completion-at-point -100 t)))
 (add-hook 'eglot-managed-mode-hook #'my-ide-eglot-capf-first)
+
+;;; Company backends
+
+;; Emacs 30's `eglot--managed-mode' narrows `company-backends' to
+;; '(company-capf) while the server manages the buffer and restores the
+;; previous value on shutdown.  The language layers deliberately keep
+;; fallback backends (company-dabbrev-code, company-files) behind
+;; company-capf for positions where the server has no candidates, so
+;; each layer registers its backends in the table below and this hook
+;; re-applies them after Eglot's narrowing.  The hook runs after the
+;; minor mode body, so it wins; on disconnect Eglot restores its saved
+;; binding, which is the same layer backend list, so both sides agree.
+(defvar my-ide-company-backends-table nil
+  "Alist of (MODES . BACKENDS) registered by the language layers.
+Filled by `my-ide-register-company-backends'.")
+
+(defun my-ide-register-company-backends (modes backends)
+  "Register BACKENDS as MODES' company completion backend list.
+MODES is a list of major-mode symbols matched with `derived-mode-p',
+mirroring `my-ide-register'.  `my-ide-restore-company-backends'
+re-applies the registered backends after Eglot narrows them."
+  (push (cons modes backends) my-ide-company-backends-table))
+
+(defun my-ide-company-backends ()
+  "Return the company backends registered for the current buffer, or nil."
+  (catch 'my-ide-found
+    (dolist (entry my-ide-company-backends-table)
+      (when (apply #'derived-mode-p (car entry))
+        (throw 'my-ide-found (cdr entry))))
+    nil))
+
+(defun my-ide-restore-company-backends ()
+  "Re-apply the language layer's company backends in this Eglot buffer."
+  (when-let* ((backends (my-ide-company-backends)))
+    (setq-local company-backends backends)))
+(add-hook 'eglot-managed-mode-hook #'my-ide-restore-company-backends)
 
 ;; Eglot reports diagnostics through Flymake; disable Flycheck in
 ;; Eglot-managed buffers so each diagnostic is not reported twice.

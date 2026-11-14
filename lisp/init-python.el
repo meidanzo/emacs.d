@@ -299,11 +299,17 @@ With prefix argument CREATE, create a new environment instead."
 ;; Company is the completion UI; `company-capf' presents the language
 ;; server's completion-at-point results.  `company-dabbrev-code' only
 ;; kicks in when the server is unavailable, so editing still works
-;; without a Python language server.
+;; without a Python language server.  The list is also registered with
+;; `my-ide-register-company-backends' so init-ide.el restores it after
+;; Eglot's managed mode narrows `company-backends' to company-capf
+;; (Emacs 30 behavior).
+(defconst my-python-company-backends
+  '(company-capf company-dabbrev-code company-files)
+  "Company backend list for Python buffers.")
+
 (defun my-python-company-setup ()
   "Prefer the server's semantic completion in the current Python buffer."
-  (setq-local company-backends
-              '(company-capf company-dabbrev-code company-files)))
+  (setq-local company-backends my-python-company-backends))
 
 (dolist (hook my-python-mode-hooks)
   (add-hook hook #'my-python-company-setup))
@@ -499,6 +505,7 @@ the default.  This is the Python implementation behind the shared
 ;; "n" keys: ,nb syntax-check, ,nt test, ,nd debug, ,nl lint, ,nf format.
 ;; init-ide.el loads after this file, hence `with-eval-after-load'.
 (with-eval-after-load 'init-ide
+  (my-ide-register-company-backends my-python-modes my-python-company-backends)
   (my-ide-register 'build my-python-modes #'my-python-check)
   (my-ide-register 'test my-python-modes #'my-python-test)
   (my-ide-register 'debug my-python-modes #'my-python-debug)

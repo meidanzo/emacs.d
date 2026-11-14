@@ -133,11 +133,19 @@ only that crate)."
 ;; Company is the completion UI; `company-capf' presents rust-analyzer's
 ;; completion-at-point results.  `company-dabbrev-code' only kicks in
 ;; when the language server is unavailable, so editing still works
-;; without rust-analyzer.
+;; without rust-analyzer.  The list is also registered with
+;; `my-ide-register-company-backends' so init-ide.el restores it after
+;; Eglot's managed mode narrows `company-backends' to company-capf
+;; (Emacs 30 behavior).
+(defconst my-rust-company-backends
+  '(company-capf company-dabbrev-code company-files)
+  "Company backend list for Rust buffers.")
+
 (defun my-rust-company-setup ()
   "Prefer rust-analyzer's semantic completion in the current Rust buffer."
-  (setq-local company-backends
-              '(company-capf company-dabbrev-code company-files)))
+  (setq-local company-backends my-rust-company-backends))
+
+(my-ide-register-company-backends my-rust-modes my-rust-company-backends)
 
 (dolist (hook my-rust-mode-hooks)
   (add-hook hook #'my-rust-company-setup))

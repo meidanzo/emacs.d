@@ -1,9 +1,9 @@
 ;;; init-CIDE.el --- personal C/C++ IDE setup  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;; The C/C++ IDE layer: build system commands (CMake/Make/Meson/Ninja/
-;; xmake/Bear), compile_commands.json management, Eglot + clangd,
-;; apheleia + clang-format, cppcheck, and the C/C++-specific ","
-;; leader keybindings.
+;; xmake/Autotools/Bear), compile_commands.json management, Eglot +
+;; clangd, apheleia + clang-format, cppcheck, and the C/C++-specific
+;; "," leader keybindings.
 ;;
 ;; The keys shared with every language layer (build/test/debug/lint/
 ;; format and the LSP rename/actions/references/reconnect keys) live
@@ -62,7 +62,8 @@ for example: (\"/usr/bin/arm-none-eabi-*\" \"/opt/toolchain/bin/*-g++\")."
 With `auto', choose a backend from the project files."
   :type '(choice (const :tag "Detect from project files" auto)
                  (const cmake) (const make) (const meson)
-                 (const ninja) (const xmake) (const generic))
+                 (const ninja) (const xmake) (const autotools)
+                 (const generic))
   :group 'my-cpp)
 
 (defcustom my-cpp-build-directory "build"
@@ -133,7 +134,7 @@ This is passed to the selected GDB or LLDB command."
 ;; Per-project overrides via .dir-locals.el (safe values only).
 (put 'my-cpp-build-system 'safe-local-variable
      (lambda (value)
-       (memq value '(auto cmake make meson ninja xmake generic))))
+       (memq value '(auto cmake make meson ninja xmake autotools generic))))
 (put 'my-cpp-debugger 'safe-local-variable
      (lambda (value) (memq value '(gdb lldb))))
 
@@ -141,7 +142,8 @@ This is passed to the selected GDB or LLDB command."
 
 (defconst my-cpp-project-markers
   '("compile_commands.json" "CMakeLists.txt" "meson.build" "xmake.lua"
-    "GNUmakefile" "Makefile" "makefile" "build.ninja" "build/build.ninja")
+    "GNUmakefile" "Makefile" "makefile" "build.ninja" "build/build.ninja"
+    "configure.ac" "Makefile.am")
   "Files that identify a C/C++ project root.")
 
 (defconst my-cpp-modes '(c-mode c-ts-mode c++-mode c++-ts-mode objc-mode)
@@ -252,6 +254,14 @@ as a standalone project."
      ((file-exists-p (expand-file-name "CMakeLists.txt" root)) 'cmake)
      ((file-exists-p (expand-file-name "meson.build" root)) 'meson)
      ((file-exists-p (expand-file-name "xmake.lua" root)) 'xmake)
+     ;; Autotools: configure.ac (or a shipped configure script) plus the
+     ;; automake input files.  Checked before Make because the generated
+     ;; Makefile appears only after running ./configure.
+     ((and (or (file-exists-p (expand-file-name "configure.ac" root))
+               (file-exists-p (expand-file-name "configure" root)))
+           (or (file-exists-p (expand-file-name "Makefile.am" root))
+               (file-exists-p (expand-file-name "Makefile.in" root))))
+      'autotools)
      ((or (file-exists-p (expand-file-name "GNUmakefile" root))
           (file-exists-p (expand-file-name "Makefile" root))
           (file-exists-p (expand-file-name "makefile" root)))
@@ -540,6 +550,24 @@ The result is always an expanded path (see `my-cpp-project-root')."
                             (shell-quote-argument build-directory)))))
     (my-cpp-compile-at root command)))
 
+;;; Autotools
+
+(defun my-cpp-autotools-configure ()
+  "Configure an Autotools project with ./configure.
+Runs ./autogen.sh first in repos that ship autogen.sh instead of a
+generated configure script (tmux does)."
+  (interactive)
+  (let* ((root (my-cpp-project-root))
+         (configure (expand-file-name "configure" root))
+         (autogen (expand-file-name "autogen.sh" root)))
+    (unless (or (file-exists-p configure) (file-exists-p autogen))
+      (user-error "No configure script or autogen.sh in %s" root))
+    (my-cpp-compile-at
+     root
+     (if (and (file-exists-p autogen) (not (file-exists-p configure)))
+         "./autogen.sh && ./configure"
+       "./configure"))))
+
 ;;; Generic commands
 
 (defun my-cpp-configure ()
@@ -549,6 +577,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
     ('cmake (my-cpp-cmake-configure))
     ('meson (my-cpp-meson-configure))
     ('xmake (my-cpp-xmake-configure))
+    ('autotools (my-cpp-autotools-configure))
     ((or 'make 'ninja)
      (message "This project is configured by its build files; use my-cpp-build."))
     (_ (user-error "No known build files found; use my-cpp-run-build-command"))))
@@ -560,7 +589,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
     ('cmake (my-cpp-cmake-build))
     ('meson (my-cpp-meson-build))
     ('xmake (my-cpp-xmake-build))
-    ('make (my-cpp-make-build))
+    ((or 'make 'autotools) (my-cpp-make-build))
     ('ninja (my-cpp-ninja-build))
     (_ (my-cpp-run-build-command compile-command))))
 
@@ -576,6 +605,8 @@ The result is always an expanded path (see `my-cpp-project-root')."
         ('xmake (my-cpp-xmake-test))
         ('make (my-cpp-run-test-command
                 (read-string "Make test command: " "make test")))
+        ('autotools (my-cpp-run-test-command
+                     (read-string "Make test command: " "make check")))
         ('ninja
          (let* ((root (my-cpp-project-root))
                 (build-directory (my-cpp-ninja-build-directory))
@@ -631,7 +662,7 @@ SOURCE may be a build directory or a path to compile_commands.json."
   "Return a useful Bear command for the detected build system."
   (let ((root (my-cpp-project-root)))
     (pcase (my-cpp-current-build-system)
-      ('make (concat "bear -- " my-cpp-make-command " -B"))
+      ((or 'make 'autotools) (concat "bear -- " my-cpp-make-command " -B"))
       ('ninja
        (let ((build-directory (my-cpp-ninja-build-directory)))
          (concat "bear -- " my-cpp-ninja-command
@@ -815,11 +846,19 @@ and fastctags (Universal Ctags) remains the completion fallback."
 ;; Company is the completion UI; `company-capf' presents Eglot/clangd's
 ;; completion-at-point results.  Keep `company-clang' out of these buffers to
 ;; avoid running a second C/C++ completion engine alongside clangd.  Do not use
-;; `c-mode-common-hook' here: it also runs in Java, Groovy, AWK, etc.
+;; `c-mode-common-hook' here: it also runs in Java, Groovy, AWK, etc.  The
+;; list is also registered with `my-ide-register-company-backends' so
+;; init-ide.el restores it after Eglot's managed mode narrows
+;; `company-backends' to company-capf (Emacs 30 behavior).
+(defconst my-cpp-company-backends
+  '(company-capf company-dabbrev-code company-files)
+  "Company backend list for C/C++ buffers.")
+
 (defun my-cpp-company-setup ()
   "Prefer clangd's semantic completion in the current C/C++ buffer."
-  (setq-local company-backends
-              '(company-capf company-dabbrev-code company-files)))
+  (setq-local company-backends my-cpp-company-backends))
+
+(my-ide-register-company-backends my-cpp-modes my-cpp-company-backends)
 
 (dolist (hook my-cpp-mode-hooks)
   (add-hook hook #'my-cpp-company-setup))
@@ -941,6 +980,19 @@ buffer."
 (my-ide-register 'debug my-cpp-modes #'my-cpp-debug)
 (my-ide-register 'lint my-cpp-modes #'my-cpp-cppcheck)
 (my-ide-register 'format my-cpp-modes #'my-cpp-format-buffer)
+
+;; The CMake mode maps also bind this layer's "," "t" keys (see the
+;; keybinding section), so CMake buffers are part of the layer.  Give
+;; them the shared operations that make sense from a CMakeLists.txt
+;; buffer too: build/test/debug/lint all dispatch from the project
+;; root and work unchanged.  Format is deliberately not registered:
+;; clang-format cannot format CMake files and apheleia has no CMake
+;; formatter here, so ,nf keeps the honest "No 'format' command" error.
+(dolist (mode '(cmake-mode cmake-ts-mode))
+  (my-ide-register 'build (list mode) #'my-cpp-build)
+  (my-ide-register 'test (list mode) #'my-cpp-test)
+  (my-ide-register 'debug (list mode) #'my-cpp-debug)
+  (my-ide-register 'lint (list mode) #'my-cpp-cppcheck))
 
 ;;; Keybindings
 
