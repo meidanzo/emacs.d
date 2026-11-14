@@ -358,7 +358,7 @@ starts in target/debug/ when that directory exists."
 ;;; Shared operations
 
 ;; Register the Rust implementations behind init-ide.el's shared ","
-;; "o" keys: ,ob build, ,oT test, ,od debug, ,oP lint, ,of format.
+;; "n" keys: ,nb build, ,nt test, ,nd debug, ,nl lint, ,nf format.
 (my-ide-register 'build my-rust-modes #'my-rust-cargo-build)
 (my-ide-register 'test my-rust-modes #'my-rust-cargo-test)
 (my-ide-register 'debug my-rust-modes #'my-rust-debug)
@@ -367,8 +367,9 @@ starts in target/debug/ when that directory exists."
 
 ;;; Keybindings
 
-;; Cargo-specific commands under the "R" prefix; the shared operations
-;; (build/test/debug/lint/format) are bound under "," "o" by init-ide.el.
+;; Cargo-specific commands under the "R" prefix, all lowercase; the
+;; shared operations (build/test/debug/lint/format) are bound under
+;; "," "n" by init-ide.el.
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "Rr" #'my-rust-cargo-run
@@ -376,8 +377,8 @@ starts in target/debug/ when that directory exists."
     "Ru" #'my-rust-cargo-update
     "Ra" #'my-rust-cargo-add
     "Rd" #'my-rust-cargo-doc
-    "RC" #'my-rust-cargo-clean
-    "RB" #'my-rust-cargo-command))
+    "Rx" #'my-rust-cargo-clean
+    "Rb" #'my-rust-cargo-command))
 
 ;;; Existing buffers
 

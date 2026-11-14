@@ -896,7 +896,7 @@ buffer."
 ;;; Shared operations
 
 ;; Register the C/C++ implementations behind init-ide.el's shared ","
-;; "o" keys: ,ob build, ,oT test, ,od debug, ,oP lint, ,of format.
+;; "n" keys: ,nb build, ,nt test, ,nd debug, ,nl lint, ,nf format.
 (my-ide-register 'build my-cpp-modes #'my-cpp-build)
 (my-ide-register 'test my-cpp-modes #'my-cpp-test)
 (my-ide-register 'debug my-cpp-modes #'my-cpp-debug)
@@ -905,18 +905,19 @@ buffer."
 
 ;;; Keybindings
 
-;; C/C++-specific keys.  The shared operations and LSP keys under the
-;; same prefix are bound by init-ide.el.
+;; C/C++-specific keys under "," "o" (the shared operations live under
+;; "," "n" in init-ide.el).  All lowercase; ,oj is j for the JSON
+;; compilation database.
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "oc" #'my-cpp-configure
-    "oD" #'my-cpp-cmake-debug-test
-    "oB" #'my-cpp-run-build-command
-    "oE" #'my-cpp-run-test-command
-    "oG" #'my-cpp-capture-compilation-database
-    "oV" #'my-cpp-check-compilation-database
+    "ob" #'my-cpp-run-build-command
+    "oe" #'my-cpp-run-test-command
+    "od" #'my-cpp-cmake-debug-test
+    "oj" #'my-cpp-capture-compilation-database
+    "ov" #'my-cpp-check-compilation-database
     "oh" #'ff-find-other-file
-    "oF" #'my-cpp-write-clang-format))
+    "of" #'my-cpp-write-clang-format))
 
 (my-cpp-configure-existing-buffers)
 

@@ -6,10 +6,14 @@
 ;; implementation of the operations below with `my-ide-register', and
 ;; keeps its language-specific keys under its own leader prefix.
 ;;
-;; Shared "," + "o" keys:
-;;   ,ob build   ,oT test   ,od debug
-;;   ,oP lint    ,of format
-;;   ,or rename  ,oa code actions  ,oi references  ,oR reconnect
+;; Shared "," + "n" keys:
+;;   ,nb build   ,nt test   ,nd debug
+;;   ,nl lint    ,nf format
+;;   ,nr rename  ,na code actions  ,ni references  ,ne reconnect
+;;
+;; Why "n": the comma is pressed with the right ring finger, so the
+;; prefix letter should sit under the left hand; n (left index) was
+;; the freest such key (only ,nm was taken, and it still works).
 ;;
 ;; Definition jump (`,vv' evil-goto-definition) is already bound
 ;; globally in init-evil.el.  To add another language, register its
@@ -30,7 +34,7 @@
 ;;   1. Operation registry     the dispatch table behind set C
 ;;   2. Shared commands        my-ide-build/test/debug/lint/format
 ;;   3. Shared Eglot setup     language-neutral LSP behavior
-;;   4. Keybindings            "," + "o" shared keys
+;;   4. Keybindings            "," + "n" shared keys
 ;;; Code:
 
 (require 'subr-x)
@@ -137,22 +141,24 @@ Used by the interactive shared commands below."
 ;;; Keybindings
 
 ;; The shared operations dispatch on the current buffer's language.
+;; All keys are lowercase; the language-specific keys under the "," "o"
+;; (C/C++) and "," "R" (Rust) prefixes are lowercase too.
 (with-eval-after-load 'evil
   (my-comma-leader-def
-    "ob" #'my-ide-build
-    "oT" #'my-ide-test
-    "od" #'my-ide-debug
-    "oP" #'my-ide-lint
-    "of" #'my-ide-format))
+    "nb" #'my-ide-build
+    "nt" #'my-ide-test
+    "nd" #'my-ide-debug
+    "nl" #'my-ide-lint
+    "nf" #'my-ide-format))
 
 ;; The LSP keys wait for Eglot since the commands come from it.
 (with-eval-after-load 'eglot
   (my-comma-leader-def
-    "or" #'eglot-rename
-    "oa" #'eglot-code-actions
+    "nr" #'eglot-rename
+    "na" #'eglot-code-actions
     ;; Find references (M-? also works; this is the comma-leader alias)
-    "oi" #'xref-find-references
-    "oR" #'eglot-reconnect))
+    "ni" #'xref-find-references
+    "ne" #'eglot-reconnect))
 
 (provide 'init-ide)
 ;;; init-ide.el ends here
