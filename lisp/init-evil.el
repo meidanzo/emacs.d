@@ -543,7 +543,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "k/" 'find-file-other-window
   "hf" 'find-function
   "hh" 'hs-toggle-hiding ; hide&show code block
-  "tr" 'cleanup-buffer-safe
+  "br" 'cleanup-buffer-safe ; formerly ,tr, freed for the Rust cargo prefix
   "tff" 'toggle-frame-fullscreen
   "tfm" 'toggle-frame-maximized
   "ci" 'evilnc-comment-or-uncomment-lines

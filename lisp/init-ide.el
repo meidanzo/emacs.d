@@ -142,8 +142,8 @@ Used by the interactive shared commands below."
 ;;; Keybindings
 
 ;; The shared operations dispatch on the current buffer's language.
-;; All keys are lowercase; the language-specific keys under the "," "o"
-;; (C/C++) and "," "R" (Rust) prefixes are lowercase too.
+;; All keys are lowercase; the language-specific keys under the "," "z"
+;; (C/C++) and "," "t" (Rust) prefixes are lowercase too.
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "nb" #'my-ide-build

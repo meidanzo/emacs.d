@@ -861,7 +861,7 @@ with four-space indentation, matching `c-basic-offset' and
 
 (defun my-cpp-format-buffer ()
   "Format the current C/C++ buffer with apheleia (clang-format).
-This is the C/C++ implementation behind the shared `,of' format key
+This is the C/C++ implementation behind the shared `,nf' format key
 bound by init-ide.el."
   (interactive)
   (if (fboundp 'apheleia-format-buffer)
@@ -905,20 +905,20 @@ buffer."
 
 ;;; Keybindings
 
-;; The "," "o" prefix is exclusively C/C++ (the former global keys
-;; ,op/,oo/,og/,otl moved to ,nc/,wo/,cg/,cxl).  The shared operations
-;; live under "," "n" in init-ide.el.  All lowercase; ,oj is j for the
-;; JSON compilation database.
+;; C/C++-specific keys under "," "z": the only completely free letter,
+;; pressed with the left pinky across the hand from the comma.  The
+;; shared operations live under "," "n" in init-ide.el.  All
+;; lowercase; ,zj is j for the JSON compilation database.
 (with-eval-after-load 'evil
   (my-comma-leader-def
-    "oc" #'my-cpp-configure
-    "ob" #'my-cpp-run-build-command
-    "oe" #'my-cpp-run-test-command
-    "od" #'my-cpp-cmake-debug-test
-    "oj" #'my-cpp-capture-compilation-database
-    "ov" #'my-cpp-check-compilation-database
-    "oh" #'ff-find-other-file
-    "of" #'my-cpp-write-clang-format))
+    "zc" #'my-cpp-configure
+    "zb" #'my-cpp-run-build-command
+    "ze" #'my-cpp-run-test-command
+    "zd" #'my-cpp-cmake-debug-test
+    "zj" #'my-cpp-capture-compilation-database
+    "zv" #'my-cpp-check-compilation-database
+    "zh" #'ff-find-other-file
+    "zf" #'my-cpp-write-clang-format))
 
 (my-cpp-configure-existing-buffers)
 

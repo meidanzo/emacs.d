@@ -44,7 +44,7 @@
 ;;   8. Build                 cargo commands
 ;;   9. Debugging             Emacs GUD + rust-gdb/rust-lldb/GDB/LLDB
 ;;  10. Shared operations     registrations for init-ide.el's keys
-;;  11. Keybindings           cargo-specific "," leader keys under "R"
+;;  11. Keybindings           cargo-specific "," leader keys under "t"
 ;;; Code:
 
 (require 'project)
@@ -367,18 +367,19 @@ starts in target/debug/ when that directory exists."
 
 ;;; Keybindings
 
-;; Cargo-specific commands under the "R" prefix, all lowercase; the
-;; shared operations (build/test/debug/lint/format) are bound under
-;; "," "n" by init-ide.el.
+;; Cargo-specific commands under "," "t" (left index), all lowercase;
+;; the shared operations (build/test/debug/lint/format) are bound
+;; under "," "n" by init-ide.el.  The former ",tr" cleanup-buffer-safe
+;; key moved to ",br" in init-evil.el to free this prefix.
 (with-eval-after-load 'evil
   (my-comma-leader-def
-    "Rr" #'my-rust-cargo-run
-    "Rc" #'my-rust-cargo-check
-    "Ru" #'my-rust-cargo-update
-    "Ra" #'my-rust-cargo-add
-    "Rd" #'my-rust-cargo-doc
-    "Rx" #'my-rust-cargo-clean
-    "Rb" #'my-rust-cargo-command))
+    "tr" #'my-rust-cargo-run
+    "tc" #'my-rust-cargo-check
+    "tu" #'my-rust-cargo-update
+    "ta" #'my-rust-cargo-add
+    "td" #'my-rust-cargo-doc
+    "tx" #'my-rust-cargo-clean
+    "tb" #'my-rust-cargo-command))
 
 ;;; Existing buffers
 
