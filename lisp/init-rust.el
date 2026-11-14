@@ -17,6 +17,10 @@
 ;; in init-ide.el; this file registers its implementations with
 ;; `my-ide-register' and keeps only cargo-specific keys here.
 ;;
+;; Cargo-specific "," + "t" keys:
+;;   ,tr 运行  ,tc 检查  ,tu 更新依赖
+;;   ,ta 加依赖  ,td 文档  ,tx 清理  ,tb 任意cargo命令
+;;
 ;; Loaded by `require-init' from init.el like the other init-* parts;
 ;; the `t' flag keeps it disabled in light weight mode.
 ;;

@@ -10,6 +10,11 @@
 ;; in init-ide.el; this file registers its implementations with
 ;; `my-ide-register' and keeps only C/C++-specific keys here.
 ;;
+;; C/C++-specific "," + "z" keys:
+;;   ,zc 配置        ,zb 自定义构建    ,ze 自定义测试
+;;   ,zd CTest调试   ,zj 捕获编译库    ,zv 检查编译库
+;;   ,zh 头/源切换   ,zf 写.clang-format
+;;
 ;; Loaded by `require-init' from init.el like the other init-* parts;
 ;; the `t' flag keeps it disabled in light weight mode.
 ;;

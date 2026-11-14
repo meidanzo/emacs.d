@@ -7,10 +7,10 @@
 ;; keeps its language-specific keys under its own leader prefix.
 ;;
 ;; Shared "," + "n" keys:
-;;   ,nb build   ,nc compile (any buffer, direct my-compile)
-;;   ,nt test    ,nd debug
-;;   ,nl lint    ,nf format
-;;   ,nr rename  ,na code actions  ,ni references  ,ne reconnect
+;;   ,nb 构建      ,nc 编译      ,nt 测试
+;;   ,nd 调试      ,nl lint     ,nf 格式化
+;;   ,nr 重命名    ,na 代码操作
+;;   ,ni 引用      ,ne 重连
 ;;
 ;; Why "n": the comma is pressed with the right ring finger, so the
 ;; prefix letter should sit under the left hand; n (left index) was
