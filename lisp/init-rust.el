@@ -17,7 +17,8 @@
 ;; in init-ide.el; this file registers its implementations with
 ;; `my-ide-register' and keeps only cargo-specific keys here.
 ;;
-;; Cargo-specific "," + "t" keys:
+;; Cargo-specific "," + "t" keys (the prefix is shared with
+;; init-CIDE.el; the buffer's mode decides which function fires):
 ;;   ,tr 运行  ,tc 检查  ,tu 更新依赖
 ;;   ,ta 加依赖  ,td 文档  ,tx 清理  ,tb 任意cargo命令
 ;;
@@ -371,14 +372,17 @@ starts in target/debug/ when that directory exists."
 
 ;;; Keybindings
 
-;; Cargo-specific commands under "," "t" (left index), all lowercase;
-;; the shared operations (build/test/debug/lint/format) are bound
-;; under "," "n" by init-ide.el.  The former ",tr" cleanup-buffer-safe
-;; key moved to ",br" in init-evil.el to free this prefix.
+;; The language layers share one prefix, "," "t" (left index): these
+;; cargo keys are bound in the Rust mode maps, the C/C++ keys in the
+;; C/C++ and CMake mode maps (init-CIDE.el), so the mode decides which
+;; function a key fires.  The shared operations (build/test/debug/
+;; lint/format) are bound under "," "n" by init-ide.el.  The former
+;; ",tr" cleanup-buffer-safe key moved to ",br" in init-evil.el to
+;; free this prefix.
 ;;
-;; The keys are scoped to the Rust mode maps, so this language layer
-;; exists only in Rust buffers; the global "," keys stay available
-;; there through keymap fallback.
+;; The mode scoping keeps this language layer out of unrelated
+;; buffers; the global "," keys stay available in Rust buffers
+;; through keymap fallback.
 (defconst my-rust-keymaps '(rust-ts-mode-map rust-mode-map)
   "Mode maps where the cargo-specific ',' 't' keys are active.")
 

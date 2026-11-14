@@ -10,10 +10,12 @@
 ;; in init-ide.el; this file registers its implementations with
 ;; `my-ide-register' and keeps only C/C++-specific keys here.
 ;;
-;; C/C++-specific "," + "z" keys:
-;;   ,zc 配置        ,zb 自定义构建    ,ze 自定义测试
-;;   ,zd CTest调试   ,zj 捕获编译库    ,zv 检查编译库
-;;   ,zh 头/源切换   ,zf 写.clang-format
+;; Language-specific "," + "t" keys (the prefix is shared with
+;; init-rust.el; the buffer's mode decides which function fires):
+;;   ,tc 配置        ,tb 自定义构建    ,te 自定义测试
+;;   ,td CTest调试   ,tj 捕获编译库    ,tv 检查编译库
+;;   ,th 头/源切换   ,tw 写.clang-format
+;; (w for write: ,tf would shadow the global ,tff/,tfm frame toggles)
 ;;
 ;; Loaded by `require-init' from init.el like the other init-* parts;
 ;; the `t' flag keeps it disabled in light weight mode.
@@ -910,21 +912,22 @@ buffer."
 
 ;;; Keybindings
 
-;; C/C++-specific keys under "," "z": the only completely free letter,
-;; pressed with the left pinky across the hand from the comma.  The
-;; shared operations live under "," "n" in init-ide.el.  All
-;; lowercase; ,zj is j for the JSON compilation database.
+;; The language layers share one prefix, "," "t" (left index): the
+;; C/C++ keys below are bound in the C/C++ and CMake mode maps, the
+;; cargo keys in the Rust mode maps (init-rust.el), so the mode
+;; decides which function a key fires.  The shared operations live
+;; under "," "n" in init-ide.el.  All lowercase; ,tj is j for the
+;; JSON compilation database.
 ;;
-;; The keys are scoped to the C/C++ and CMake mode maps, so this
-;; language layer exists only in language buffers; the global ","
-;; keys stay available there through keymap fallback.  CMake buffers
-;; are included so the project commands work from a CMakeLists.txt
-;; buffer.
+;; The mode scoping keeps this language layer out of unrelated
+;; buffers; the global "," keys stay available in language buffers
+;; through keymap fallback.  CMake buffers are included so the
+;; project commands work from a CMakeLists.txt buffer.
 (defconst my-cpp-keymaps
   '(c-mode-map c++-mode-map objc-mode-map
     c-ts-mode-map c++-ts-mode-map
     cmake-mode-map cmake-ts-mode-map)
-  "Mode maps where the C/C++-specific ',' 'z' keys are active.")
+  "Mode maps where the C/C++-specific ',' 't' keys are active.")
 
 ;; The mode maps exist only after their libraries load (all built in).
 (ignore-errors (require 'c-ts-mode))
@@ -935,14 +938,14 @@ buffer."
 (with-eval-after-load 'evil
   (my-comma-leader-def
     :keymaps my-cpp-keymaps
-    "zc" #'my-cpp-configure
-    "zb" #'my-cpp-run-build-command
-    "ze" #'my-cpp-run-test-command
-    "zd" #'my-cpp-cmake-debug-test
-    "zj" #'my-cpp-capture-compilation-database
-    "zv" #'my-cpp-check-compilation-database
-    "zh" #'ff-find-other-file
-    "zf" #'my-cpp-write-clang-format))
+    "tc" #'my-cpp-configure
+    "tb" #'my-cpp-run-build-command
+    "te" #'my-cpp-run-test-command
+    "td" #'my-cpp-cmake-debug-test
+    "tj" #'my-cpp-capture-compilation-database
+    "tv" #'my-cpp-check-compilation-database
+    "th" #'ff-find-other-file
+    "tw" #'my-cpp-write-clang-format))
 
 (my-cpp-configure-existing-buffers)
 

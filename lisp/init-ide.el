@@ -4,7 +4,9 @@
 ;; does one thing in every supported language project.  Each language
 ;; layer (init-CIDE.el, init-rust.el, ...) registers its own
 ;; implementation of the operations below with `my-ide-register', and
-;; keeps its language-specific keys under its own leader prefix.
+;; binds its language-specific keys under the shared "," "t" prefix in
+;; its own mode maps, so the buffer's mode decides which function a
+;; key fires.
 ;;
 ;; Shared "," + "n" keys:
 ;;   ,nb 构建      ,nc 编译      ,nt 测试
@@ -18,7 +20,8 @@
 ;;
 ;; Definition jump (`,vv' evil-goto-definition) is already bound
 ;; globally in init-evil.el.  To add another language, register its
-;; commands from its own init file; nothing here needs to change.
+;; commands and bind its language-specific keys under "," "t" from its
+;; own init file; nothing here needs to change.
 ;;
 ;; This file also holds the language-neutral Eglot setup shared by
 ;; every LSP language layer (server completion first, inlay hints,
@@ -143,8 +146,9 @@ Used by the interactive shared commands below."
 
 ;; The shared operations dispatch on the current buffer's language.
 ;; These keys stay global (usable in every buffer); the
-;; language-specific layers are bound in their mode maps only: "," "z"
-;; for C/C++ (init-CIDE.el) and "," "t" for Rust (init-rust.el).
+;; language-specific layers share one prefix, "," "t", bound in their
+;; respective mode maps (init-CIDE.el, init-rust.el) so the mode
+;; decides which function fires.
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "nb" #'my-ide-build
