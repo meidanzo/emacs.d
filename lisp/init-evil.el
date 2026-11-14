@@ -595,7 +595,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   ;; shadow-free.
   "cg" 'org-agenda ; formerly ,og
   "cxl" 'org-toggle-link-display ; formerly ,otl
-  "qq" 'my-multi-purpose-grep
+  "qq" 'fastctags-grep
   "dd" 'fastctags-grep-current-directory
   "dc" 'my-grep-pinyin-in-current-directory
   "dg" 'my-grep-pinyin-in-project

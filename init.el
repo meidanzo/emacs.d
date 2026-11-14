@@ -172,8 +172,7 @@
   (unless my-lightweight-mode-p
     ;; my personal setup, other major-mode specific setup need it.
     ;; It's dependent on *.el in `my-site-lisp-dir'
-    (my-run-with-idle-timer 1 (lambda () (load "~/.custom.el" t nil)))))
-
+    (my-run-with-idle-timer 1 (lambda () (load (expand-file-name "~/.custom.el") t nil)))))
 
 ;; @see https://www.reddit.com/r/emacs/comments/55ork0/is_emacs_251_noticeably_slower_than_245_on_windows/
 ;; Emacs 25 does gc too frequently
@@ -193,8 +192,6 @@
            gcs-done))
 (add-hook 'after-init-hook #'my-report-startup-time)
 
-(put 'erase-buffer 'disabled nil)
-
 ;; 解决中英文混排的时候折行错误
 (global-visual-line-mode 1)
 (setq word-wrap-by-category t)
@@ -204,14 +201,9 @@
 (xclip-mode 1)
 
 (require 'rime)
-
-;; 启动快捷键记录
-;; 仅当 keyfreq 尚未启动时才运行 turnon-keyfreq-mode
-(when (and (featurep 'keyfreq)
-           (not (bound-and-true-p keyfreq-mode))
-           (not (bound-and-true-p keyfreq-autosave-mode))
-           (fboundp 'turnon-keyfreq-mode))
-  (turnon-keyfreq-mode))
+(put 'erase-buffer 'disabled nil)
+(provide 'init)
 ;;; Local Variables:
 ;;; no-byte-compile: t
 ;;; End:
+;;; init.el ends here

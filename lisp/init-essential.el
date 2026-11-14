@@ -3,31 +3,6 @@
 ;; Like "init-misc.el", but this file is always loaded
 
 ;;; Code:
-(defun my-multi-purpose-grep (n)
-  "Run different grep from N."
-  (interactive "P")
-  (my-ensure 'fastctags)
-  (cond
-   ((not n)
-    (fastctags-grep))
-   ((= n 1)
-    ;; grep references of current web component
-    ;; component could be inside styled-component like `const c = styled(Comp1)`
-    (let* ((fb (file-name-base buffer-file-name)))
-      (when (string= "index" fb)
-        (setq fb (file-name-base (directory-file-name (file-name-directory (directory-file-name buffer-file-name))))))
-        (fastctags-grep (format "(<%s( *$| [^ ])|styled\\\(%s\\))" fb fb))))
-   ((= n 2)
-    ;; grep web component attribute name
-    (fastctags-grep (format "^ *%s[=:]" (or (thing-at-point 'symbol)
-                                                (read-string "Component attribute name?")))))
-   ((= n 3)
-    ;; grep current file name
-    (fastctags-grep (format ".*%s" (file-name-nondirectory buffer-file-name))))
-   ((= n 4)
-    ;; grep js files which is imported
-    (fastctags-grep (format "from .*%s('|\\\.js');?"
-                                (file-name-base (file-name-nondirectory buffer-file-name)))))))
 
 (defun my-grep-pinyin-in-current-directory ()
   "Grep pinyin (no english) in current directory."
@@ -109,10 +84,11 @@ If USE-INDIRECT-BUFFER is t, use `indirect-buffer' to hold widen content."
    ;; narrow to specific org element
    ((derived-mode-p 'org-mode)
     (cond
-     ((ignore-errors (org-edit-src-code)) t)
+     ((ignore-errors (org-edit-src-code) t))
      ((ignore-errors (org-narrow-to-block) t))
      ((ignore-errors (org-narrow-to-element) t))
-     (t (org-narrow-to-subtree))))
+     (t
+      (org-narrow-to-subtree))))
 
    ((derived-mode-p 'diff-mode)
     (let* (b e)
@@ -220,26 +196,6 @@ If USE-INDIRECT-BUFFER is t, use `indirect-buffer' to hold widen content."
                 try-expand-dabbrev-all-buffers
                 try-expand-dabbrev-from-kill))
 (global-set-key (kbd "M-/") 'hippie-expand)
-
-(defun my-compile (&optional arg)
-  "Call `compile' command with ARG."
-  (interactive "P")
-  (when arg
-    ;; prepare extra option and cc it to `kill-ring'
-    (my-ensure 'which-func)
-    (let* ((extra-opt (which-function)))
-      (setq extra-opt (replace-regexp-in-string "tdd\\.it\\." "" extra-opt))
-
-      (cond
-       ;; jest unit test
-       ((and buffer-file-name (string-match "\\.[tj]s$" buffer-file-name))
-        (setq extra-opt (format " -t \"%s\" " extra-opt)))
-
-       ;; do nothing
-       (t
-        (setq extra-opt (format "\"%s\" " extra-opt))))
-      (if extra-opt (kill-new extra-opt))))
-  (call-interactively 'compile))
 
 ;; {{ eacl - emacs auto complete line(s)
 (global-set-key (kbd "C-x C-l") 'eacl-complete-line-from-buffer-or-project)
