@@ -2,7 +2,13 @@
 ;;; Commentary:
 ;; The C/C++ IDE layer: build system commands (CMake/Make/Meson/Ninja/
 ;; xmake/Bear), compile_commands.json management, Eglot + clangd,
-;; apheleia + clang-format, cppcheck, and the "," leader keybindings.
+;; apheleia + clang-format, cppcheck, and the C/C++-specific ","
+;; leader keybindings.
+;;
+;; The keys shared with every language layer (build/test/debug/lint/
+;; format and the LSP rename/actions/references/reconnect keys) live
+;; in init-ide.el; this file registers its implementations with
+;; `my-ide-register' and keeps only C/C++-specific keys here.
 ;;
 ;; Loaded by `require-init' from init.el like the other init-* parts;
 ;; the `t' flag keeps it disabled in light weight mode.
@@ -10,6 +16,7 @@
 ;; Dependencies (all loaded earlier by init.el):
 ;; - `my-buffer-file-temp-p' from init-utils.el
 ;; - `my-comma-leader-def' from init-evil.el (requires evil)
+;; - `my-ide-register' from init-ide.el
 ;; - company, flycheck, apheleia (from init-elpa.el); Eglot is built in
 ;;
 ;; Section overview:
@@ -22,7 +29,8 @@
 ;;   7. LSP                     Eglot + clangd wiring
 ;;   8. Formatting              apheleia + clang-format
 ;;   9. Static analysis         cppcheck
-;;  10. Keybindings             "," leader keys
+;;  10. Shared operations       registrations for init-ide.el's keys
+;;  11. Keybindings             C/C++-specific "," leader keys
 ;;; Code:
 
 (require 'json)
@@ -730,16 +738,6 @@ Bear for Make, Ninja, and generic build commands."
          '(("neocmakelsp" "stdio")
            ("cmake-language-server"))))
 
-  ;; Emacs 30.1's eglot returns the literal docstring
-  ;; "LSP identifier at point" as the fallback of this method when not
-  ;; prompting, so programmatic xref queries (for example evil's
-  ;; `evil-goto-definition' xref backend, or any Lisp call to
-  ;; `xref-find-definitions') send that junk string to clangd and every
-  ;; definition jump fails.  Return the symbol at point instead, which is
-  ;; exactly what xref expects from this method.
-  (cl-defmethod xref-backend-identifier-at-point ((_backend (eql eglot)))
-    (or (thing-at-point 'symbol) ""))
-
   ;; Replace the default entry instead of `add-to-list': Emacs 30 already
   ;; ships an entry for the same mode list (a clangd/ccls chooser), so
   ;; add-to-list left a stale duplicate behind.  `equal' is needed because
@@ -757,8 +755,11 @@ Bear for Make, Ninja, and generic build commands."
            "--enable-config")
          (when my-cpp-clangd-query-drivers
            (list (concat "--query-driver="
-                         (string-join my-cpp-clangd-query-drivers ","))))))
-  (setq eglot-autoshutdown t))
+                         (string-join my-cpp-clangd-query-drivers ",")))))))
+
+;; The language-neutral Eglot setup shared by all language layers
+;; (`my-ide-eglot-capf-first', inlay hints, Flymake-only diagnostics,
+;; the xref identifier fix, autoshutdown) lives in init-ide.el.
 
 (defun my-cpp-eglot-ensure ()
   "Start Eglot in a C/C++ buffer, skipping temporary buffers.
@@ -772,15 +773,6 @@ and fastctags (Universal Ctags) remains the completion fallback."
 (dolist (hook my-cpp-mode-hooks)
   (add-hook hook #'my-cpp-eglot-ensure))
 
-(defun my-cpp-eglot-capf-first ()
-  "Put clangd's completion-at-point function before fallback sources."
-  (when (fboundp 'eglot-completion-at-point)
-    (setq-local completion-at-point-functions
-                (cons #'eglot-completion-at-point
-                      (remove #'eglot-completion-at-point
-                              completion-at-point-functions)))))
-(add-hook 'eglot-managed-mode-hook #'my-cpp-eglot-capf-first)
-
 ;; Company is the completion UI; `company-capf' presents Eglot/clangd's
 ;; completion-at-point results.  Keep `company-clang' out of these buffers to
 ;; avoid running a second C/C++ completion engine alongside clangd.  Do not use
@@ -793,20 +785,8 @@ and fastctags (Universal Ctags) remains the completion fallback."
 (dolist (hook my-cpp-mode-hooks)
   (add-hook hook #'my-cpp-company-setup))
 
-;; Eglot uses Flymake; avoid duplicate Flycheck diagnostics.
-(defun my-cpp-disable-flycheck ()
-  (when (bound-and-true-p flycheck-mode)
-    (flycheck-mode -1)))
-(add-hook 'eglot-managed-mode-hook #'my-cpp-disable-flycheck)
-
 (with-eval-after-load 'flycheck
   (setq flycheck-global-modes (cons 'not my-cpp-modes)))
-
-;; Inlay hints (deduced types, parameter names) from clangd.  The mode
-;; turns itself off when the server lacks :inlayHintProvider.
-(with-eval-after-load 'eglot
-  (when (fboundp 'eglot-inlay-hints-mode)
-    (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)))
 
 ;; CMake buffers: start Eglot only when a CMake language server is
 ;; installed.  The mapping is registered explicitly below for Emacs 29.1+
@@ -879,6 +859,15 @@ with four-space indentation, matching `c-basic-offset' and
   (dolist (mode my-cpp-modes)
     (setf (alist-get mode apheleia-mode-alist) 'my-cpp-clang-format)))
 
+(defun my-cpp-format-buffer ()
+  "Format the current C/C++ buffer with apheleia (clang-format).
+This is the C/C++ implementation behind the shared `,of' format key
+bound by init-ide.el."
+  (interactive)
+  (if (fboundp 'apheleia-format-buffer)
+      (apheleia-format-buffer)
+    (user-error "apheleia is not available; cannot format the buffer")))
+
 ;;; Static analysis
 
 (defun my-cpp-cppcheck ()
@@ -904,31 +893,30 @@ buffer."
           (apheleia-mode 1))
         (my-cpp-eglot-ensure)))))
 
+;;; Shared operations
+
+;; Register the C/C++ implementations behind init-ide.el's shared ","
+;; "o" keys: ,ob build, ,oT test, ,od debug, ,oP lint, ,of format.
+(my-ide-register 'build my-cpp-modes #'my-cpp-build)
+(my-ide-register 'test my-cpp-modes #'my-cpp-test)
+(my-ide-register 'debug my-cpp-modes #'my-cpp-debug)
+(my-ide-register 'lint my-cpp-modes #'my-cpp-cppcheck)
+(my-ide-register 'format my-cpp-modes #'my-cpp-format-buffer)
+
 ;;; Keybindings
 
+;; C/C++-specific keys.  The shared operations and LSP keys under the
+;; same prefix are bound by init-ide.el.
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "oc" #'my-cpp-configure
-    "ob" #'my-cpp-build
-    "oT" #'my-cpp-test
     "oD" #'my-cpp-cmake-debug-test
     "oB" #'my-cpp-run-build-command
     "oE" #'my-cpp-run-test-command
     "oG" #'my-cpp-capture-compilation-database
     "oV" #'my-cpp-check-compilation-database
     "oh" #'ff-find-other-file
-    "od" #'my-cpp-debug
-    "oP" #'my-cpp-cppcheck)
-  (my-comma-leader-def
     "oF" #'my-cpp-write-clang-format))
-
-(with-eval-after-load 'eglot
-  (my-comma-leader-def
-    "or" #'eglot-rename
-    "oa" #'eglot-code-actions
-    "oR" #'eglot-reconnect
-    ;; Find references (M-? also works; this is the comma-leader alias)
-    "oi" #'xref-find-references))
 
 (my-cpp-configure-existing-buffers)
 

@@ -5,12 +5,17 @@
 ;;   1. Completion           company-capf driven by rust-analyzer via Eglot
 ;;   2. Style / indentation  4-space indent, no tabs (both Rust modes)
 ;;   3. Navigation           xref definitions/references via Eglot (keys in
-;;                           init-evil.el and init-CIDE.el)
+;;                           init-evil.el and init-ide.el)
 ;;   4. Project navigation   Cargo.toml roots for project.el and ffip
 ;;   5. Diagnostics          Eglot + Flymake, clippy lints on every save
 ;;   6. Formatting           apheleia + rustfmt on save, edition-aware
 ;;   7. Build                cargo build/run/test/check/clippy/fmt/...
 ;;   8. Debugging            Emacs GUD + rust-gdb/rust-lldb/GDB/LLDB
+;;
+;; The keys shared with every language layer (build/test/debug/lint/
+;; format and the LSP rename/actions/references/reconnect keys) live
+;; in init-ide.el; this file registers its implementations with
+;; `my-ide-register' and keeps only cargo-specific keys here.
 ;;
 ;; Loaded by `require-init' from init.el like the other init-* parts;
 ;; the `t' flag keeps it disabled in light weight mode.
@@ -25,6 +30,7 @@
 ;; - `my-buffer-file-temp-p' from init-utils.el
 ;; - `my-comma-leader-def' from init-evil.el (requires evil)
 ;; - `my-rust-langserver-exist' from init-tree-sitter.el
+;; - `my-ide-register' from init-ide.el
 ;; - company, flycheck, apheleia (from init-elpa.el); Eglot is built in
 ;;
 ;; Section overview:
@@ -37,7 +43,8 @@
 ;;   7. Formatting            apheleia + rustfmt
 ;;   8. Build                 cargo commands
 ;;   9. Debugging             Emacs GUD + rust-gdb/rust-lldb/GDB/LLDB
-;;  10. Keybindings           "," leader keys under the "R" prefix
+;;  10. Shared operations     registrations for init-ide.el's keys
+;;  11. Keybindings           cargo-specific "," leader keys under "R"
 ;;; Code:
 
 (require 'project)
@@ -155,19 +162,12 @@ still works with dabbrev-based completion alone."
   (add-hook hook #'my-rust-eglot-ensure))
 
 ;; Putting `eglot-completion-at-point' first in
-;; `completion-at-point-functions' is done globally by
-;; `my-cpp-eglot-capf-first' in init-CIDE.el, and inlay hints
-;; (parameter names, deduced types) are enabled for all Eglot buffers
-;; there too; toggle them with M-x eglot-inlay-hints-mode.
+;; `completion-at-point-functions', inlay hints (parameter names,
+;; deduced types), Flymake-only diagnostics, and the xref identifier
+;; fix are the language-neutral Eglot setup in init-ide.el; toggle
+;; hints with M-x eglot-inlay-hints-mode.
 
 ;;; Diagnostics
-
-;; Eglot reports rust-analyzer diagnostics through Flymake; disable
-;; Flycheck in Rust buffers so each diagnostic is not reported twice.
-(defun my-rust-disable-flycheck ()
-  (when (bound-and-true-p flycheck-mode)
-    (flycheck-mode -1)))
-(add-hook 'eglot-managed-mode-hook #'my-rust-disable-flycheck)
 
 (with-eval-after-load 'flycheck
   ;; init-CIDE.el turns `flycheck-global-modes' into a `(not ...)'
@@ -355,24 +355,29 @@ starts in target/debug/ when that directory exists."
                      (shell-quote-argument debugger)
                      (shell-quote-argument executable)))))))
 
+;;; Shared operations
+
+;; Register the Rust implementations behind init-ide.el's shared ","
+;; "o" keys: ,ob build, ,oT test, ,od debug, ,oP lint, ,of format.
+(my-ide-register 'build my-rust-modes #'my-rust-cargo-build)
+(my-ide-register 'test my-rust-modes #'my-rust-cargo-test)
+(my-ide-register 'debug my-rust-modes #'my-rust-debug)
+(my-ide-register 'lint my-rust-modes #'my-rust-cargo-clippy)
+(my-ide-register 'format my-rust-modes #'my-rust-cargo-fmt)
+
 ;;; Keybindings
 
-;; `,rb' and `,rr' are already taken globally (evilmr-replace-in-buffer,
-;; my-recentf), so the cargo commands live under the free "R" prefix.
+;; Cargo-specific commands under the "R" prefix; the shared operations
+;; (build/test/debug/lint/format) are bound under "," "o" by init-ide.el.
 (with-eval-after-load 'evil
   (my-comma-leader-def
-    "Rb" #'my-rust-cargo-build
     "Rr" #'my-rust-cargo-run
-    "Rt" #'my-rust-cargo-test
     "Rc" #'my-rust-cargo-check
-    "Rl" #'my-rust-cargo-clippy
-    "Rf" #'my-rust-cargo-fmt
     "Ru" #'my-rust-cargo-update
     "Ra" #'my-rust-cargo-add
     "Rd" #'my-rust-cargo-doc
     "RC" #'my-rust-cargo-clean
-    "RB" #'my-rust-cargo-command
-    "Rg" #'my-rust-debug))
+    "RB" #'my-rust-cargo-command))
 
 ;;; Existing buffers
 

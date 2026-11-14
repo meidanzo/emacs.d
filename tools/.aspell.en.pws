@@ -1,4 +1,4 @@
-personal_ws-1.1 en 371
+personal_ws-1.1 en 373
 acodec
 adoc
 aider
@@ -371,3 +371,5 @@ GUD
 LLDB
 executables
 Eglot's
+CIDE
+ide

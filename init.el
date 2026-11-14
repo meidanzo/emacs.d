@@ -146,13 +146,20 @@
   (require-init 'init-rime-ui)
   (require-init 'init-rime) ;; init-rime需要使用 site-lisp 中的 im-cursor-chg
 
-  ;; C/C++ IDE: depends on init-utils (my-buffer-file-temp-p) and
-  ;; init-evil (my-comma-leader-def), both loaded above.
+  ;; Language-neutral IDE operations (set C): the shared build/test/debug/
+  ;; lint/format dispatch and LSP keys.  Must load before init-CIDE and
+  ;; init-rust, which register their implementations with my-ide-register.
+  ;; Depends on init-evil (my-comma-leader-def), loaded above.
+  (require-init 'init-ide t)
+
+  ;; C/C++ IDE: depends on init-utils (my-buffer-file-temp-p), init-evil
+  ;; (my-comma-leader-def), and init-ide (my-ide-register), all loaded
+  ;; above.
   (require-init 'init-CIDE t)
 
   ;; Rust IDE: depends on init-tree-sitter (my-rust-langserver-exist and
-  ;; the rust grammar auto-install), init-utils and init-evil, all loaded
-  ;; above.
+  ;; the rust grammar auto-install), init-utils, init-evil, and init-ide
+  ;; (my-ide-register), all loaded above.
   (require-init 'init-rust t)
 
   ;; ediff configuration should be last so it can override
