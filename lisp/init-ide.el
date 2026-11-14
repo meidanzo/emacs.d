@@ -7,7 +7,8 @@
 ;; keeps its language-specific keys under its own leader prefix.
 ;;
 ;; Shared "," + "n" keys:
-;;   ,nb build   ,nt test   ,nd debug
+;;   ,nb build   ,nc compile (any buffer, direct my-compile)
+;;   ,nt test    ,nd debug
 ;;   ,nl lint    ,nf format
 ;;   ,nr rename  ,na code actions  ,ni references  ,ne reconnect
 ;;
@@ -146,6 +147,9 @@ Used by the interactive shared commands below."
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "nb" #'my-ide-build
+    ;; ,nc does not dispatch: my-compile (init-essential.el) is already
+    ;; language-neutral and works in every buffer.  Formerly ,op.
+    "nc" #'my-compile
     "nt" #'my-ide-test
     "nd" #'my-ide-debug
     "nl" #'my-ide-lint

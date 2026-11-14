@@ -905,9 +905,10 @@ buffer."
 
 ;;; Keybindings
 
-;; C/C++-specific keys under "," "o" (the shared operations live under
-;; "," "n" in init-ide.el).  All lowercase; ,oj is j for the JSON
-;; compilation database.
+;; The "," "o" prefix is exclusively C/C++ (the former global keys
+;; ,op/,oo/,og/,otl moved to ,nc/,wo/,cg/,cxl).  The shared operations
+;; live under "," "n" in init-ide.el.  All lowercase; ,oj is j for the
+;; JSON compilation database.
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "oc" #'my-cpp-configure

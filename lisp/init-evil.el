@@ -557,6 +557,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "wl" 'evil-window-right
   "wk" 'evil-window-up
   "wj" 'evil-window-down
+  "wo" 'delete-other-windows ; formerly ,oo
   ;; }}
   "rv" 'my-rename-thing-at-point
   "ag" 'ast-grep-rewrite
@@ -582,8 +583,6 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   ;; @see https://github.com/pidu/git-timemachine
   ;; p: previous; n: next; w:hash; W:complete hash; g:nth version; q:quit
   "tm" 'my-git-timemachine
-  ;; toggle overview,  @see http://emacs.wordpress.com/2007/01/16/quick-and-dirty-code-folding/
-  "op" 'my-compile
   "c$" 'org-archive-subtree ; `C-c $'
   ;; org-do-demote/org-do-premote support selected region
   "c<" 'org-do-promote ; `C-c C-<'
@@ -591,6 +590,11 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "cxi" 'org-clock-in ; `C-c C-x C-i'
   "cxo" 'org-clock-out ; `C-c C-x C-o'
   "cxr" 'org-clock-report ; `C-c C-x C-r'
+  ;; org keys live under the "c" prefix since init-CIDE.el owns ",o".
+  ;; ,cxl joins the existing ",cx" map so the ",ct" comment key stays
+  ;; shadow-free.
+  "cg" 'org-agenda ; formerly ,og
+  "cxl" 'org-toggle-link-display ; formerly ,otl
   "qq" 'my-multi-purpose-grep
   "dd" 'fastctags-grep-current-directory
   "dc" 'my-grep-pinyin-in-current-directory
@@ -618,7 +622,6 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "sq" 'delete-window
   "sa" 'split-window-vertically
   "sd" 'split-window-horizontally
-  "oo" 'delete-other-windows
   ;; }}
   "cr" 'my-windows-setup
   "uu" 'my-transient-winner-undo
@@ -629,9 +632,6 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "fb" 'my-spell-check-buffer
   "fe" 'flyspell-goto-next-error
   "fa" 'flyspell-auto-correct-word
-  "og" 'org-agenda
-
-  "otl" 'org-toggle-link-display
   "ar" 'align-regexp
   "wrn" 'httpd-restart-now
   "wrd" 'httpd-restart-at-default-directory
