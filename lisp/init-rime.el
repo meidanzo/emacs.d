@@ -21,6 +21,7 @@
 ;; 进入 insert mode 自动激活输入法
 ;; C-\ 开启/关闭输入法
 ;; enter 键上屏编码而非字符
+;; 输入过程中 Tab/Shift+Tab 按音节(词)移动光标
 ;; escape 键清空候选框并进入 normal mode
 ;; GUI 模式 "C-`" 切换输入法
 ;; 断言生效情况下 "M-p" 强制输入中文
@@ -265,6 +266,30 @@ This function must be side-effect free and UI-agnostic."
   (when (featurep 'evil-escape)
     (evil-escape-mode 1)))
 
+;; {{ Tab/Shift+Tab 按音节(词)移动光标
+;; Rime 的 key_bindings.yaml 里有 move_by_word_with_tab:
+;;   Tab       -> Shift+Right
+;;   Shift+Tab -> Shift+Left
+;; 但 TAB 在 Emacs 里是 C-i(9), 直接交给 `rime-send-keybinding' 会被当作
+;; Control+i 发给 librime; Rime 需要的是 Tab 的 keysym(0xff09), 故这里
+;; 先合成一个 tab 事件再转发.
+;; 注意命令名必须以 "rime-" 开头: emacs-rime 的 pre-command-hook 会把
+;; 非 rime-* 命令当作无关命令, 在命令执行前清空组合状态.
+(declare-function rime-send-keybinding "rime" nil t)
+
+(defun rime-send-tab ()
+  "Send a real Tab key to librime."
+  (interactive)
+  (let ((last-input-event 'tab))
+    (rime-send-keybinding)))
+
+(defun rime-send-shift-tab ()
+  "Send Shift+Tab to librime."
+  (interactive)
+  (let ((last-input-event 'S-tab))
+    (rime-send-keybinding)))
+;; }}
+
 (with-eval-after-load 'rime
 
   ;; 不要启动时初始化 Rime, 否则发生段错误.
@@ -287,6 +312,12 @@ This function must be side-effect free and UI-agnostic."
   ;; 组合键默认值
   (setq rime-translate-keybindings
         '("C-f" "C-b" "C-n" "C-p" "C-g" "<left>" "<right>" "<up>" "<down>" "<prior>" "<next>" "<delete>"))
+
+  ;; Rime 中用 Tab/Shift+Tab 按音节移动光标 (move_by_word_with_tab).
+  ;; rime-active-mode-map 只在有编码(组合中)时生效, 不影响平时 Tab 的缩进.
+  (define-key rime-active-mode-map (kbd "TAB") #'rime-send-tab)
+  (define-key rime-active-mode-map (kbd "<backtab>") #'rime-send-shift-tab)
+  (define-key rime-active-mode-map (kbd "S-<tab>") #'rime-send-shift-tab)
 
   ;; C-` 只能在GUI 环境下使用. 两个快捷键都只能在启用输入法状态下使用.
   ;; Emacs不会转发F5按键, 不要将F5绑定到rime-send-keybinding.
