@@ -1,9 +1,9 @@
 ;;; init-CIDE.el --- personal C/C++ IDE setup  -*- lexical-binding: t; -*-
 ;;; Commentary:
-;; The C/C++ IDE layer: build system commands (CMake/Autotools/Make/
-;; Meson/Ninja/xmake/Bear), compile_commands.json management, Eglot +
-;; clangd, apheleia + clang-format, cppcheck, and the C/C++-specific
-;; "," leader keybindings.
+;; The C/C++ IDE layer: build system commands (CMake/qmake/Autotools/
+;; Make/Meson/Ninja/xmake/Bear), compile_commands.json management,
+;; Eglot + clangd, apheleia + clang-format, cppcheck, and the
+;; C/C++-specific "," leader keybindings.
 ;;
 ;; The keys shared with every language layer (build/test/debug/lint/
 ;; format and the LSP rename/actions/references/reconnect keys) live
@@ -61,8 +61,8 @@ for example: (\"/usr/bin/arm-none-eabi-*\" \"/opt/toolchain/bin/*-g++\")."
   "Build system used by the common C/C++ commands.
 With `auto', choose a backend from the project files."
   :type '(choice (const :tag "Detect from project files" auto)
-                 (const cmake) (const autotools) (const make) (const meson)
-                 (const ninja) (const xmake) (const generic))
+                 (const cmake) (const qmake) (const autotools) (const make)
+                 (const meson) (const ninja) (const xmake) (const generic))
   :group 'my-cpp)
 
 (defcustom my-cpp-build-directory "build"
@@ -83,6 +83,18 @@ With `auto', choose a backend from the project files."
 (defcustom my-cpp-ninja-command "ninja"
   "Command used to build Ninja projects."
   :type 'string
+  :group 'my-cpp)
+
+(defcustom my-cpp-qmake-program "qmake"
+  "qmake executable used to configure .pro projects.
+Set to qmake-qt6 or an absolute path when several Qt versions are
+installed and the default resolves to the wrong one."
+  :type 'string
+  :group 'my-cpp)
+
+(defcustom my-cpp-qmake-configure-options nil
+  "Extra qmake arguments, each passed as one shell-quoted argument."
+  :type '(repeat string)
   :group 'my-cpp)
 
 (defcustom my-cpp-cmake-build-config "Debug"
@@ -138,7 +150,7 @@ This is passed to the selected GDB or LLDB command."
 ;; Per-project overrides via .dir-locals.el (safe values only).
 (put 'my-cpp-build-system 'safe-local-variable
      (lambda (value)
-       (memq value '(auto cmake autotools make meson ninja xmake generic))))
+       (memq value '(auto cmake qmake autotools make meson ninja xmake generic))))
 (put 'my-cpp-debugger 'safe-local-variable
      (lambda (value) (memq value '(gdb lldb))))
 
@@ -149,6 +161,25 @@ This is passed to the selected GDB or LLDB command."
     "configure" "configure.ac" "configure.in" "Makefile.am" "autogen.sh"
     "GNUmakefile" "Makefile" "makefile" "build.ninja" "build/build.ninja")
   "Files that identify a C/C++ project root.")
+
+;; qmake project files (.pro) have no fixed name, so they cannot join
+;; `my-cpp-project-markers' (`locate-dominating-file' takes literal
+;; names).  These helpers find them instead.
+(defun my-cpp-qmake-project-file (directory)
+  "Return the .pro project file directly in DIRECTORY, or nil.
+With several .pro files, the first in alphabetical order wins."
+  (car (directory-files directory t "\\.pro\\'" t)))
+
+(defun my-cpp-qmake-root (directory)
+  "Return the nearest ancestor of DIRECTORY holding a .pro file, or nil."
+  (let ((directory (file-name-as-directory directory))
+        root)
+    (while (and directory (not root))
+      (if (my-cpp-qmake-project-file directory)
+          (setq root directory)
+        (let ((parent (file-name-directory (directory-file-name directory))))
+          (setq directory (unless (equal parent directory) parent)))))
+    root))
 
 (defconst my-cpp-modes '(c-mode c-ts-mode c++-mode c++-ts-mode objc-mode)
   "Major modes treated as C/C++ by this configuration.
@@ -181,9 +212,10 @@ Return a transient project rooted at the outermost build-file marker
 below DIRECTORY, or nil when DIRECTORY is under version control."
   (unless (ignore-errors (vc-responsible-backend directory))
     (let ((roots (delq nil
-                       (mapcar (lambda (marker)
-                                 (locate-dominating-file directory marker))
-                               my-cpp-project-markers))))
+                       (cons (my-cpp-qmake-root directory)
+                             (mapcar (lambda (marker)
+                                       (locate-dominating-file directory marker))
+                                     my-cpp-project-markers)))))
       (when roots
         (cons 'transient
               (car (sort roots (lambda (left right)
@@ -212,9 +244,10 @@ that embed the root."
    (expand-file-name
     (or (my-cpp-vc-root)
         (let ((roots (delq nil
-                           (mapcar (lambda (marker)
-                                     (locate-dominating-file default-directory marker))
-                                   my-cpp-project-markers))))
+                           (cons (my-cpp-qmake-root default-directory)
+                                 (mapcar (lambda (marker)
+                                           (locate-dominating-file default-directory marker))
+                                         my-cpp-project-markers)))))
           (car (sort roots (lambda (left right)
                              (> (length left) (length right))))))
         (when-let* ((project (project-current)))
@@ -267,6 +300,7 @@ as a standalone project."
                (or (file-exists-p (expand-file-name "Makefile.am" root))
                    (file-exists-p (expand-file-name "autogen.sh" root)))))
       'autotools)
+     ((my-cpp-qmake-project-file root) 'qmake)
      ((or (file-exists-p (expand-file-name "GNUmakefile" root))
           (file-exists-p (expand-file-name "Makefile" root))
           (file-exists-p (expand-file-name "makefile" root)))
@@ -604,6 +638,31 @@ The result is always an expanded path (see `my-cpp-project-root')."
                             (shell-quote-argument build-directory)))))
     (my-cpp-compile-at root command)))
 
+;;; qmake
+
+(defun my-cpp-qmake-configure ()
+  "Configure the qmake project in the project root.
+qmake generates a Makefile in the current directory, so the project
+builds in-source like a Make project."
+  (interactive)
+  (let* ((root (my-cpp-project-root))
+         (project-file (my-cpp-qmake-project-file root))
+         (options (mapconcat #'shell-quote-argument
+                             my-cpp-qmake-configure-options " ")))
+    (unless project-file
+      (user-error "No .pro file found in %s" root))
+    (unless (executable-find my-cpp-qmake-program)
+      (user-error "%s is not on PATH; set `my-cpp-qmake-program'"
+                  my-cpp-qmake-program))
+    (my-cpp-compile-at
+     root
+     (string-join
+      (delq nil
+            (list (shell-quote-argument my-cpp-qmake-program)
+                  (unless (string-empty-p options) options)
+                  (shell-quote-argument (file-relative-name project-file root))))
+      " "))))
+
 ;;; Generic commands
 
 (defun my-cpp-configure ()
@@ -614,6 +673,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
     ('autotools (my-cpp-autotools-configure))
     ('meson (my-cpp-meson-configure))
     ('xmake (my-cpp-xmake-configure))
+    ('qmake (my-cpp-qmake-configure))
     ((or 'make 'ninja)
      (message "This project is configured by its build files; use my-cpp-build."))
     (_ (user-error "No known build files found; use my-cpp-run-build-command"))))
@@ -626,6 +686,9 @@ The result is always an expanded path (see `my-cpp-project-root')."
     ('autotools (my-cpp-autotools-build))
     ('meson (my-cpp-meson-build))
     ('xmake (my-cpp-xmake-build))
+    ;; qmake generates a Makefile in the project root, so the Make
+    ;; backend's build command is exactly right.
+    ('qmake (my-cpp-make-build))
     ('make (my-cpp-make-build))
     ('ninja (my-cpp-ninja-build))
     (_ (my-cpp-run-build-command compile-command))))
@@ -643,6 +706,8 @@ The result is always an expanded path (see `my-cpp-project-root')."
         ('xmake (my-cpp-xmake-test))
         ('make (my-cpp-run-test-command
                 (read-string "Make test command: " "make test")))
+        ('qmake (my-cpp-run-test-command
+                 (read-string "Make test command: " "make check")))
         ('ninja
          (let* ((root (my-cpp-project-root))
                 (build-directory (my-cpp-ninja-build-directory))
@@ -698,7 +763,7 @@ SOURCE may be a build directory or a path to compile_commands.json."
   "Return a useful Bear command for the detected build system."
   (let ((root (my-cpp-project-root)))
     (pcase (my-cpp-current-build-system)
-      ('make (concat "bear -- " my-cpp-make-command " -B"))
+      ((or 'make 'qmake) (concat "bear -- " my-cpp-make-command " -B"))
       ('autotools
        (format "bear -- %s -B -C %s" my-cpp-make-command
                (shell-quote-argument (my-cpp-autotools-build-directory))))
@@ -715,7 +780,7 @@ SOURCE may be a build directory or a path to compile_commands.json."
 (defun my-cpp-capture-compilation-database (command)
   "Generate or capture compile_commands.json for the current project.
 Use native database export for CMake, Meson, and xmake. COMMAND is used with
-Bear for Autotools, Make, Ninja, and generic build commands."
+Bear for Autotools, Make, Ninja, qmake, and generic build commands."
   (interactive
    (if (memq (my-cpp-current-build-system) '(cmake meson xmake))
        (list nil)
