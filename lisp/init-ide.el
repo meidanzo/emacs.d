@@ -42,6 +42,7 @@
 ;;; Code:
 
 (require 'subr-x)
+(require 'cl-lib)
 
 ;;; Operation registry
 
@@ -55,18 +56,28 @@ through.")
 
 (defun my-ide-register (op modes command)
   "Register COMMAND as MODES' implementation of the shared operation OP.
-OP is a symbol naming an operation, such as `build' or `debug'."
+OP is a symbol naming an operation, such as `build' or `debug'.
+A second registration for the same OP and MODES replaces the first, so
+re-evaluating a language layer does not pile up duplicate entries."
   (setf (alist-get op my-ide-operation-table)
         (cons (cons modes command)
-              (alist-get op my-ide-operation-table))))
+              (assoc-delete-all modes (alist-get op my-ide-operation-table)
+                                #'equal))))
+
+(defun my-ide-find-entry (entries)
+  "Return the cdr of the first ENTRY whose mode list matches this buffer.
+ENTRIES is a list of (MODES . VALUE); MODES is matched with
+`derived-mode-p'.  Shared by the operation and company tables, which
+have the same shape."
+  (catch 'my-ide-found
+    (dolist (entry entries)
+      (when (apply #'derived-mode-p (car entry))
+        (throw 'my-ide-found (cdr entry))))
+    nil))
 
 (defun my-ide-operation-command (op)
   "Return the command registered for OP in the current buffer, or nil."
-  (catch 'my-ide-found
-    (dolist (implementation (alist-get op my-ide-operation-table))
-      (when (apply #'derived-mode-p (car implementation))
-        (throw 'my-ide-found (cdr implementation))))
-    nil))
+  (my-ide-find-entry (alist-get op my-ide-operation-table)))
 
 ;;; Shared commands
 
@@ -108,8 +119,32 @@ Used by the interactive shared commands below."
 ;; which language server it talks to; the language layers used to pick
 ;; them up from init-CIDE.el.
 
+(defcustom my-ide-eglot-log-events nil
+  "Non-nil keeps Eglot's per-server events buffer (for debugging).
+The events buffer records every JSON-RPC message, which costs CPU and
+memory with chatty servers such as clangd.  Leave it nil and turn it on
+only while diagnosing a server problem."
+  :type 'boolean
+  :group 'tools)
+
 (with-eval-after-load 'eglot
   (setq eglot-autoshutdown t)
+
+  ;; Jumping to a definition outside the project (a system header, say)
+  ;; opens a file the project's server does not own.  Without this, the
+  ;; language layers' `eglot-ensure' mode hooks would start another
+  ;; server rooted at that file's directory, one per directory visited.
+  (setq eglot-extend-to-xref t)
+
+  (unless my-ide-eglot-log-events
+    (cond
+     ;; Emacs 30 / Eglot 1.17+: a plist of :size and :format.
+     ((boundp 'eglot-events-buffer-config)
+      (setq eglot-events-buffer-config
+            (plist-put (copy-sequence eglot-events-buffer-config) :size 0)))
+     ;; Emacs 29.
+     ((boundp 'eglot-events-buffer-size)
+      (setq eglot-events-buffer-size 0))))
 
   ;; Emacs 30.1's eglot returns the literal docstring
   ;; "LSP identifier at point" as the fallback of this method when not
@@ -127,15 +162,24 @@ Used by the interactive shared commands below."
     (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)))
 
 (defun my-ide-eglot-capf-first ()
-  "Put the server's completion-at-point function before fallback sources."
-  (when (fboundp 'eglot-completion-at-point)
+  "Put the server's completion-at-point function before fallback sources.
+`eglot-managed-mode-hook' runs both when Eglot starts and when it stops
+managing a buffer.  Do nothing on stop: Eglot has just removed its
+function and re-adding it would leave a dead capf behind."
+  (when (and (fboundp 'eglot-completion-at-point)
+             (fboundp 'eglot-managed-p)
+             (eglot-managed-p))
     ;; completion-at-point-functions is a hook variable: its
     ;; buffer-local value ends with the hook's t marker (meaning "run
     ;; the global hook members after the local ones").  Rebuilding the
     ;; list by hand with setq-local can duplicate or misplace members
-    ;; and must special-case the marker, so use add-hook with a
-    ;; negative depth instead; it conses the function onto the front
-    ;; of the local hook and keeps the hook structure intact.
+    ;; and must special-case the marker, so use add-hook rather than
+    ;; rebuilding the list.  `add-hook' does nothing for a function
+    ;; that is already a member, and Eglot has already added its own
+    ;; entry; remove that first so the negative depth below really
+    ;; moves the function to the front.
+    (remove-hook 'completion-at-point-functions
+                 #'eglot-completion-at-point t)
     (add-hook 'completion-at-point-functions
               #'eglot-completion-at-point -100 t)))
 (add-hook 'eglot-managed-mode-hook #'my-ide-eglot-capf-first)
@@ -159,16 +203,16 @@ Filled by `my-ide-register-company-backends'.")
   "Register BACKENDS as MODES' company completion backend list.
 MODES is a list of major-mode symbols matched with `derived-mode-p',
 mirroring `my-ide-register'.  `my-ide-restore-company-backends'
-re-applies the registered backends after Eglot narrows them."
-  (push (cons modes backends) my-ide-company-backends-table))
+re-applies the registered backends after Eglot narrows them.
+A second registration for the same MODES replaces the first."
+  (setq my-ide-company-backends-table
+        (cons (cons modes backends)
+              (assoc-delete-all modes my-ide-company-backends-table
+                                #'equal))))
 
 (defun my-ide-company-backends ()
   "Return the company backends registered for the current buffer, or nil."
-  (catch 'my-ide-found
-    (dolist (entry my-ide-company-backends-table)
-      (when (apply #'derived-mode-p (car entry))
-        (throw 'my-ide-found (cdr entry))))
-    nil))
+  (my-ide-find-entry my-ide-company-backends-table))
 
 (defun my-ide-restore-company-backends ()
   "Re-apply the language layer's company backends in this Eglot buffer."
@@ -179,9 +223,32 @@ re-applies the registered backends after Eglot narrows them."
 ;; Eglot reports diagnostics through Flymake; disable Flycheck in
 ;; Eglot-managed buffers so each diagnostic is not reported twice.
 (defun my-ide-disable-flycheck ()
-  (when (bound-and-true-p flycheck-mode)
+  "Turn Flycheck off in the current buffer when Eglot manages it."
+  (when (and (bound-and-true-p flycheck-mode)
+             (fboundp 'eglot-managed-p)
+             (eglot-managed-p))
     (flycheck-mode -1)))
 (add-hook 'eglot-managed-mode-hook #'my-ide-disable-flycheck)
+
+;; Language layers also keep `global-flycheck-mode' out of their modes
+;; from the start.  They must do it additively: a plain `setq' of
+;; `flycheck-global-modes' in each layer would make the layer loaded
+;; last silently undo the others.
+(defvar flycheck-global-modes)
+
+(defun my-ide-flycheck-modes-excluding (current modes)
+  "Return the `flycheck-global-modes' value CURRENT with MODES excluded."
+  (pcase current
+    ('t (cons 'not (copy-sequence modes)))
+    (`(not . ,old) (cons 'not (cl-union old modes)))
+    ((pred consp) (cl-set-difference current modes))
+    (_ current)))
+
+(defun my-ide-flycheck-exclude (modes)
+  "Keep Flycheck's global mode out of the major MODES, keeping other exclusions."
+  (with-eval-after-load 'flycheck
+    (setq flycheck-global-modes
+          (my-ide-flycheck-modes-excluding flycheck-global-modes modes))))
 
 ;;; Keybindings
 
@@ -193,9 +260,10 @@ re-applies the registered backends after Eglot narrows them."
 (with-eval-after-load 'evil
   (my-comma-leader-def
     "nb" #'my-ide-build
-    ;; ,nc does not dispatch: my-compile (init-essential.el) is already
-    ;; language-neutral and works in every buffer.  Formerly ,op.
-    "nc" #'my-compile
+    ;; ,nc does not dispatch: `compile' is already language-neutral and
+    ;; works in every buffer.  Formerly ,op; `my-compile' was removed
+    ;; upstream (commit e5ab235a).
+    "nc" #'compile
     "nt" #'my-ide-test
     "nd" #'my-ide-debug
     "nl" #'my-ide-lint

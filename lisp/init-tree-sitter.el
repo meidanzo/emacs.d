@@ -23,7 +23,7 @@
 ;;   GUARD          function deciding whether auto-install is allowed
 ;;                  (only install when a matching language server exists)
 (defvar my-treesit-language-specs
-  `((c      "https://github.com/tree-sitter/tree-sitter-c"      "v0.23.6" my-cpp-langserver-exist)
+  '((c      "https://github.com/tree-sitter/tree-sitter-c"      "v0.23.6" my-cpp-langserver-exist)
     (cpp    "https://github.com/tree-sitter/tree-sitter-cpp"    "v0.23.4" my-cpp-langserver-exist)
     ;; tree-sitter-cmake's master branch still vendors an old parser.h, so
     ;; it compiles against both ABI 14 and newer runtimes.

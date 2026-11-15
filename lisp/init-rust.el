@@ -35,7 +35,7 @@
 ;; - `my-buffer-file-temp-p' from init-utils.el
 ;; - `my-comma-leader-def' from init-evil.el (requires evil)
 ;; - `my-rust-langserver-exist' from init-tree-sitter.el
-;; - `my-ide-register' from init-ide.el
+;; - `my-ide-register', `my-ide-flycheck-exclude' from init-ide.el
 ;; - company, flycheck, apheleia (from init-elpa.el); Eglot is built in
 ;;
 ;; Section overview:
@@ -108,6 +108,17 @@ The plain `gdb' and `lldb' choices use the system debuggers directly."
 (dolist (hook my-rust-mode-hooks)
   (add-hook hook #'my-rust-mode-setup))
 
+;; Rust-aware operator prettification (->, =>, &&, ...).  Both Rust
+;; modes already set their own `prettify-symbols-alist' (rust-ts-mode
+;; and rust-mode via rust-prog-mode, with the same entries and a
+;; compose predicate that tells `&&' the double reference from the
+;; logical and), so just turn the minor mode on.
+(defun my-rust-prettify ()
+  "Show Rust operators as Unicode symbols (->, =>, &&, ...)."
+  (prettify-symbols-mode 1))
+(dolist (hook my-rust-mode-hooks)
+  (add-hook hook #'my-rust-prettify))
+
 ;;; Project detection
 
 ;; Make project.el (and with it Eglot, ffip, and xref) recognize Rust
@@ -123,10 +134,11 @@ its own Cargo.toml, so cargo commands run from that member's
 directory act on that member only (for example `cargo test' tests
 only that crate)."
   (file-name-as-directory
-   (or (locate-dominating-file default-directory "Cargo.toml")
-       (when-let* ((project (project-current)))
-         (project-root project))
-       default-directory)))
+   (expand-file-name
+    (or (locate-dominating-file default-directory "Cargo.toml")
+        (when-let* ((project (project-current)))
+          (project-root project))
+        default-directory))))
 
 ;;; Completion
 
@@ -182,18 +194,11 @@ still works with dabbrev-based completion alone."
 
 ;;; Diagnostics
 
-(with-eval-after-load 'flycheck
-  ;; init-CIDE.el turns `flycheck-global-modes' into a `(not ...)'
-  ;; blocklist; extend it.  With the default value t, convert it.  Any
-  ;; other shape (an allowlist) does not enable Rust modes, so leave it.
-  (setq flycheck-global-modes
-        (cond
-         ((eq flycheck-global-modes t)
-          (cons 'not my-rust-modes))
-         ((and (listp flycheck-global-modes)
-               (eq (car flycheck-global-modes) 'not))
-          (cons 'not (append (cdr flycheck-global-modes) my-rust-modes)))
-         (t flycheck-global-modes))))
+;; Additive exclusion via init-ide.el's helper: a plain `setq' of
+;; `flycheck-global-modes' here would be overwritten by, or overwrite,
+;; the C/C++ layer's exclusion (which shape the final value gets would
+;; depend on the load order).
+(my-ide-flycheck-exclude my-rust-modes)
 
 ;;; Formatting: apheleia + rustfmt
 

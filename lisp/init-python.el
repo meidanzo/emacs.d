@@ -147,7 +147,8 @@ The environment is activated only when it already exists."
   (when-let* ((project (ignore-errors (project-current))))
     (let ((root (ignore-errors (project-root project))))
       ;; Activating a remote venv would put TRAMP paths into `exec-path'.
-      (and root (not (file-remote-p root)) root))))
+      (and root (not (file-remote-p root))
+           (expand-file-name root)))))
 
 (defun my-python--venv-p (directory)
   "Return non-nil when DIRECTORY is a Python virtual environment."

@@ -23,7 +23,9 @@
 ;; Dependencies (all loaded earlier by init.el):
 ;; - `my-buffer-file-temp-p' from init-utils.el
 ;; - `my-comma-leader-def' from init-evil.el (requires evil)
-;; - `my-ide-register' from init-ide.el
+;; - `my-ide-register', `my-ide-flycheck-exclude' from init-ide.el
+;; - `my-cmake-langserver-exist' is optional (init-tree-sitter.el); a
+;;   built-in check is used when it is not defined
 ;; - company, flycheck, apheleia (from init-elpa.el); Eglot is built in
 ;;
 ;; Section overview:
@@ -54,6 +56,32 @@
   "Compiler executable globs clangd may query for target and system headers.
 Set this to the actual compiler paths emitted by compile_commands.json,
 for example: (\"/usr/bin/arm-none-eabi-*\" \"/opt/toolchain/bin/*-g++\")."
+  :type '(repeat string)
+  :group 'my-cpp)
+
+(defcustom my-cpp-clangd-program "clangd"
+  "The clangd executable Eglot starts for C/C++ buffers.
+Set to a versioned name (for example \"clangd-19\") or an absolute path
+when plain `clangd' is missing or resolves to the wrong version."
+  :type 'string
+  :group 'my-cpp)
+
+(defcustom my-cpp-clangd-args
+  '("--background-index"
+    "--background-index-priority=low"
+    "--pch-storage=memory"
+    "--clang-tidy"
+    "--completion-style=detailed"
+    "--header-insertion=iwyu"
+    "--enable-config")
+  "Arguments passed to clangd, before the --query-driver argument.
+Several of these equal clangd's own defaults; they are spelled out so a
+default changing in a later clangd does not silently change behavior."
+  :type '(repeat string)
+  :group 'my-cpp)
+
+(defcustom my-cpp-cppcheck-extra-args nil
+  "Extra arguments appended to the cppcheck command line of `my-cpp-cppcheck'."
   :type '(repeat string)
   :group 'my-cpp)
 
@@ -167,8 +195,10 @@ This is passed to the selected GDB or LLDB command."
 ;; names).  These helpers find them instead.
 (defun my-cpp-qmake-project-file (directory)
   "Return the .pro project file directly in DIRECTORY, or nil.
-With several .pro files, the first in alphabetical order wins."
-  (car (directory-files directory t "\\.pro\\'" t)))
+With several .pro files, the first in alphabetical order wins.
+Errors (an unreadable ancestor) mean \"no .pro file here\" because this
+also runs on the `project-current' path."
+  (car (ignore-errors (directory-files directory t "\\.pro\\'"))))
 
 (defun my-cpp-qmake-root (directory)
   "Return the nearest ancestor of DIRECTORY holding a .pro file, or nil."
@@ -191,6 +221,23 @@ instead of adding a duplicate.")
   '(c-mode-hook c++-mode-hook objc-mode-hook c-ts-mode-hook c++-ts-mode-hook)
   "Mode hooks matching `my-cpp-modes'.")
 
+(defun my-cpp--nearest-marker-root (directory)
+  "Return the nearest ancestor of DIRECTORY holding a project marker, or nil.
+Considers `my-cpp-project-markers' and qmake .pro files.  Every candidate
+is an ancestor of DIRECTORY, so the longest path is the nearest one.  The
+paths are expanded before they are compared: `locate-dominating-file'
+abbreviates a home-relative result with ~, which would make it look
+shorter than the equally deep result of `my-cpp-qmake-root'."
+  (let ((roots (delq nil
+                     (cons (my-cpp-qmake-root directory)
+                           (mapcar (lambda (marker)
+                                     (locate-dominating-file directory marker))
+                                   my-cpp-project-markers)))))
+    (when roots
+      (car (sort (mapcar #'expand-file-name roots)
+                 (lambda (left right)
+                   (> (length left) (length right))))))))
+
 ;; Make project.el recognize C/C++ projects that are not under version
 ;; control (for example a Bear-captured Make project without .git).
 ;; `my-cpp-project-root' already finds these markers itself, but Eglot and
@@ -208,18 +255,15 @@ instead of adding a duplicate.")
 ;; backend keeps the original non-VC use case.
 (defun my-cpp-project-try-local (directory)
   "Recognize a C/C++ project by its build files when no VC root exists.
-Return a transient project rooted at the outermost build-file marker
-below DIRECTORY, or nil when DIRECTORY is under version control."
-  (unless (ignore-errors (vc-responsible-backend directory))
-    (let ((roots (delq nil
-                       (cons (my-cpp-qmake-root directory)
-                             (mapcar (lambda (marker)
-                                       (locate-dominating-file directory marker))
-                                     my-cpp-project-markers)))))
-      (when roots
-        (cons 'transient
-              (car (sort roots (lambda (left right)
-                                 (> (length left) (length right))))))))))
+Return a transient project rooted at the nearest ancestor of DIRECTORY
+that holds a build-file marker, or nil when DIRECTORY is under version
+control or on a remote host.  Remote directories are skipped because this
+runs on every `project-current' call and each marker probe would be a
+round trip."
+  (unless (or (file-remote-p directory)
+              (ignore-errors (vc-responsible-backend directory)))
+    (when-let* ((root (my-cpp--nearest-marker-root directory)))
+      (cons 'transient root))))
 
 (with-eval-after-load 'project
   (add-hook 'project-find-functions #'my-cpp-project-try-local t))
@@ -243,13 +287,7 @@ that embed the root."
   (file-name-as-directory
    (expand-file-name
     (or (my-cpp-vc-root)
-        (let ((roots (delq nil
-                           (cons (my-cpp-qmake-root default-directory)
-                                 (mapcar (lambda (marker)
-                                           (locate-dominating-file default-directory marker))
-                                         my-cpp-project-markers)))))
-          (car (sort roots (lambda (left right)
-                             (> (length left) (length right))))))
+        (my-cpp--nearest-marker-root default-directory)
         (when-let* ((project (project-current)))
           (project-root project))
         default-directory))))
@@ -258,12 +296,12 @@ that embed the root."
   "Return non-nil when DIRECTORY's CMakeLists.txt declares a project.
 Subdirectory CMakeLists.txt files are normally fragments included with
 `add_subdirectory' and contain no `project' command."
-  (let ((file (expand-file-name "CMakeLists.txt" directory)))
+  (let ((file (expand-file-name "CMakeLists.txt" directory))
+        (case-fold-search t))
     (and (file-readable-p file)
          (with-temp-buffer
            (insert-file-contents file)
-           (re-search-forward
-            "^[ \t]*[Pp][Rr][Oo][Jj][Ee][Cc][Tt][ \t]*(" nil t)))))
+           (re-search-forward "^[ \t]*project[ \t]*(" nil t)))))
 
 (defun my-cpp-cmake-root ()
   "Return the CMake project root, or the generic project root.
@@ -329,7 +367,13 @@ as a standalone project."
       (when my-cpp-after-compilation-success
         (let ((callback my-cpp-after-compilation-success))
           (setq my-cpp-after-compilation-success nil)
-          (apply (car callback) (cdr callback)))))))
+          ;; This runs inside `compilation-finish-functions'.  A signalled
+          ;; error (for example the `user-error' from declining to replace
+          ;; compile_commands.json) would skip the remaining members of
+          ;; that hook, so report it as a message instead.
+          (condition-case err
+              (apply (car callback) (cdr callback))
+            (error (message "%s" (error-message-string err)))))))))
 
 (add-hook 'compilation-finish-functions #'my-cpp-compilation-finished)
 
@@ -369,7 +413,8 @@ The result is always an expanded path (see `my-cpp-project-root')."
       ((and (= (length candidates) 1) (not choose))
        (car candidates))
       ((> (length candidates) 1)
-       (completing-read "CMake build directory: " candidates nil t))
+       ;; When configuring (CHOOSE), accept a new directory name too.
+       (completing-read "CMake build directory: " candidates nil (not choose)))
       (t
        (read-directory-name
         "CMake build directory: " root
@@ -449,7 +494,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
       ((and (= (length candidates) 1) (not choose))
        (car candidates))
       ((> (length candidates) 1)
-       (completing-read "Meson build directory: " candidates nil t))
+       (completing-read "Meson build directory: " candidates nil (not choose)))
       (t
        (read-directory-name
         "Meson build directory: " root
@@ -554,24 +599,35 @@ The result is always an expanded path (see `my-cpp-project-root')."
 
 (defun my-cpp-autotools-configure ()
   "Run an Autotools project's bootstrap and configure steps.
-Use `autogen.sh' when the project has not generated its configure script."
+Without a generated configure script, bootstrap with `autogen.sh' when the
+project has one (run with NOCONFIGURE=1 so it does not configure inside the
+source tree, which would make the out-of-source build below refuse to
+run), or else with `autoreconf -fi'."
   (interactive)
   (let* ((root (my-cpp-project-root))
          (build-directory (my-cpp-autotools-build-directory))
          (configure (expand-file-name "configure" root))
          (autogen (expand-file-name "autogen.sh" root))
          (options (mapconcat #'shell-quote-argument
-                             my-cpp-autotools-configure-options " ")))
-    (unless (or (file-executable-p configure)
-                (file-executable-p autogen))
-      (user-error "No executable configure or autogen.sh found in %s" root))
+                             my-cpp-autotools-configure-options " "))
+         (bootstrap
+          (cond
+           ((file-executable-p configure) nil)
+           ((file-executable-p autogen) "NOCONFIGURE=1 ./autogen.sh")
+           ((and (executable-find "autoreconf")
+                 (or (file-exists-p (expand-file-name "configure.ac" root))
+                     (file-exists-p (expand-file-name "configure.in" root))))
+            "autoreconf -fi"))))
+    (unless (or (file-executable-p configure) bootstrap)
+      (user-error "No configure script, executable autogen.sh, or configure.ac with autoreconf in %s"
+                  root))
     (my-cpp-compile-at
      root
      (string-join
       (delq nil
-            (list (unless (file-executable-p configure)
+            (list (when bootstrap
                     (concat "cd " (shell-quote-argument root)
-                            " && ./autogen.sh"))
+                            " && " bootstrap))
                   (concat "mkdir -p " (shell-quote-argument build-directory))
                   (concat "cd " (shell-quote-argument build-directory))
                   (concat (shell-quote-argument configure)
@@ -620,7 +676,8 @@ The result is always an expanded path (see `my-cpp-project-root')."
       ((and (= (length candidates) 1) (not choose))
        (car candidates))
       ((> (length candidates) 1)
-       (completing-read "Ninja build directory: " candidates nil t))
+       ;; When configuring (CHOOSE), accept a new directory name too.
+       (completing-read "Ninja build directory: " candidates nil (not choose)))
       (t
        (read-directory-name
         "Ninja build directory: " root
@@ -691,7 +748,10 @@ builds in-source like a Make project."
     ('qmake (my-cpp-make-build))
     ('make (my-cpp-make-build))
     ('ninja (my-cpp-ninja-build))
-    (_ (my-cpp-run-build-command compile-command))))
+    ;; Prompt (with `compile-command' as the default) rather than run it
+    ;; blindly: `compile' stores the last command globally, so it may be
+    ;; one from another project.
+    (_ (call-interactively #'my-cpp-run-build-command))))
 
 (defun my-cpp-test ()
   "Run the project's standard test command or prompt for a custom one."
@@ -705,9 +765,11 @@ builds in-source like a Make project."
         ('meson (my-cpp-meson-test))
         ('xmake (my-cpp-xmake-test))
         ('make (my-cpp-run-test-command
-                (read-string "Make test command: " "make test")))
+                (read-string "Make test command: "
+                             (concat my-cpp-make-command " test"))))
         ('qmake (my-cpp-run-test-command
-                 (read-string "Make test command: " "make check")))
+                 (read-string "Make test command: "
+                              (concat my-cpp-make-command " check"))))
         ('ninja
          (let* ((root (my-cpp-project-root))
                 (build-directory (my-cpp-ninja-build-directory))
@@ -775,7 +837,7 @@ SOURCE may be a build directory or a path to compile_commands.json."
       ('meson (format "bear -- meson compile -C %s"
                       (shell-quote-argument
                        (my-cpp-meson-build-directory))))
-      (_ "bear -- make -B"))))
+      (_ (concat "bear -- " my-cpp-make-command " -B")))))
 
 (defun my-cpp-capture-compilation-database (command)
   "Generate or capture compile_commands.json for the current project.
@@ -801,6 +863,31 @@ Bear for Autotools, Make, Ninja, qmake, and generic build commands."
        root command
        (list #'my-cpp-check-compilation-database root)))))
 
+(defun my-cpp--read-json-file (file)
+  "Return the JSON in FILE as lists and alists with symbol keys.
+Uses Emacs's native parser when it is available: it is far faster than
+json.el on the multi-megabyte databases of large projects.  The native
+parser interns alist keys on some builds and returns strings on others,
+so the keys are normalized to symbols here; callers use one form."
+  (let ((data
+         (if (fboundp 'json-parse-buffer)
+             (with-temp-buffer
+               (insert-file-contents file)
+               (json-parse-buffer :object-type 'alist :array-type 'list
+                                  :null-object nil :false-object nil))
+           (let ((json-object-type 'alist)
+                 (json-array-type 'list)
+                 (json-key-type 'symbol))
+             (json-read-file file)))))
+    (mapcar (lambda (entry)
+              (mapcar (lambda (pair)
+                        (cons (if (stringp (car pair))
+                                  (intern (car pair))
+                                (car pair))
+                              (cdr pair)))
+                      entry))
+            data)))
+
 (defun my-cpp-check-compilation-database (&optional root)
   "Check the structure and paths in ROOT's compile_commands.json."
   (interactive)
@@ -809,20 +896,28 @@ Bear for Autotools, Make, Ninja, qmake, and generic build commands."
     (unless (file-readable-p database)
       (user-error "No readable compilation database at %s" database))
     (condition-case error-data
-        (let* ((json-object-type 'alist)
-               (json-array-type 'list)
-               (json-key-type 'string)
-               (entries (json-read-file database))
+        (let* ((entries (my-cpp--read-json-file database))
+               ;; Nearly every entry shares one working directory, so stat
+               ;; each distinct directory only once.
+               (directory-cache (make-hash-table :test #'equal))
                (invalid 0)
                (missing 0))
           (dolist (entry entries)
-            (let ((directory (cdr (assoc "directory" entry)))
-                  (file (cdr (assoc "file" entry)))
-                  (command (or (cdr (assoc "command" entry))
-                               (cdr (assoc "arguments" entry)))))
-              (if (or (not (and directory (file-directory-p directory)))
-                      (not (and file (not (string-empty-p file))))
-                      (not (and command (not (equal command "")))))
+            (let* ((directory (alist-get 'directory entry))
+                   (file (alist-get 'file entry))
+                   (command (or (alist-get 'command entry)
+                                (alist-get 'arguments entry)))
+                   (directory-ok
+                    (and (stringp directory)
+                         (let ((hit (gethash directory directory-cache 'unset)))
+                           (if (eq hit 'unset)
+                               (puthash directory (file-directory-p directory)
+                                        directory-cache)
+                             hit)))))
+              (if (or (not directory-ok)
+                      (not (and (stringp file) (not (string-empty-p file))))
+                      (not command)
+                      (equal command ""))
                   (cl-incf invalid)
                 (unless (file-exists-p (expand-file-name file directory))
                   (cl-incf missing)))))
@@ -903,6 +998,19 @@ Bear for Autotools, Make, Ninja, qmake, and generic build commands."
 ;; clangd 19 does not accept a YAML fragment via --config on the command
 ;; line; the Diagnostics/ClangTidy settings live in
 ;; ~/.config/clangd/config.yaml (or in a project's .clangd file).
+
+(defun my-cpp-clangd-contact (&rest _)
+  "Return the clangd command line for Eglot.
+Eglot calls this each time it starts a server (the extra arguments it may
+pass are ignored), so changes to `my-cpp-clangd-program', `my-cpp-clangd-args'
+and `my-cpp-clangd-query-drivers' -- including directory-local values --
+apply to the next server without re-evaluating this file."
+  (append (list my-cpp-clangd-program)
+          my-cpp-clangd-args
+          (when my-cpp-clangd-query-drivers
+            (list (concat "--query-driver="
+                          (string-join my-cpp-clangd-query-drivers ","))))))
+
 (with-eval-after-load 'eglot
   ;; Keep CMake language-server discovery explicit so this also works on
   ;; the declared Emacs 29.1 minimum, which may not ship Emacs 30's default.
@@ -917,19 +1025,10 @@ Bear for Autotools, Make, Ninja, qmake, and generic build commands."
   ;; add-to-list left a stale duplicate behind.  `equal' is needed because
   ;; `alist-get' compares with `eq' by default, which can never match a
   ;; quoted literal list.
+  ;; The contact is a function so it is evaluated when a server starts,
+  ;; not once when Eglot loads (see `my-cpp-clangd-contact').
   (setf (alist-get my-cpp-modes eglot-server-programs nil nil 'equal)
-        (append
-         '("clangd"
-           "--background-index"
-           "--background-index-priority=low"
-           "--pch-storage=memory"
-           "--clang-tidy"
-           "--completion-style=detailed"
-           "--header-insertion=iwyu"
-           "--enable-config")
-         (when my-cpp-clangd-query-drivers
-           (list (concat "--query-driver="
-                         (string-join my-cpp-clangd-query-drivers ",")))))))
+        #'my-cpp-clangd-contact))
 
 ;; The language-neutral Eglot setup shared by all language layers
 ;; (`my-ide-eglot-capf-first', inlay hints, Flymake-only diagnostics,
@@ -941,7 +1040,7 @@ Also skipped when clangd is not installed, so that editing still works
 and fastctags (Universal Ctags) remains the completion fallback."
   (unless (and (fboundp 'my-buffer-file-temp-p)
                (my-buffer-file-temp-p))
-    (when (executable-find "clangd")
+    (when (executable-find my-cpp-clangd-program)
       (eglot-ensure))))
 
 (dolist (hook my-cpp-mode-hooks)
@@ -967,16 +1066,23 @@ and fastctags (Universal Ctags) remains the completion fallback."
 (dolist (hook my-cpp-mode-hooks)
   (add-hook hook #'my-cpp-company-setup))
 
-(with-eval-after-load 'flycheck
-  (setq flycheck-global-modes (cons 'not my-cpp-modes)))
+;; Additive (see init-ide.el): a plain `setq' here would be overwritten by,
+;; or overwrite, the other language layers' exclusions.
+(my-ide-flycheck-exclude my-cpp-modes)
 
 ;; CMake buffers: start Eglot only when a CMake language server is
 ;; installed.  The mapping is registered explicitly below for Emacs 29.1+
 ;; compatibility.
 (defun my-cmake-eglot-ensure ()
-  "Start Eglot in CMake buffers when a CMake language server is installed."
-  (when (my-cmake-langserver-exist)
-    (eglot-ensure)))
+  "Start Eglot in CMake buffers when a CMake language server is installed.
+Skips temporary buffers, like `my-cpp-eglot-ensure'."
+  (unless (and (fboundp 'my-buffer-file-temp-p)
+               (my-buffer-file-temp-p))
+    (when (if (fboundp 'my-cmake-langserver-exist)
+              (my-cmake-langserver-exist)
+            (or (executable-find "neocmakelsp")
+                (executable-find "cmake-language-server")))
+      (eglot-ensure))))
 (add-hook 'cmake-mode-hook #'my-cmake-eglot-ensure)
 (add-hook 'cmake-ts-mode-hook #'my-cmake-eglot-ensure)
 
@@ -1020,21 +1126,34 @@ The project's .clang-format wins; without one, fall back to Google style
 with four-space indentation, matching `c-basic-offset' and
 `c-ts-mode-indent-offset'.")
 
+;; `auto-save-visited-mode' (init-misc.el, 0.5s interval) saves through
+;; `save-some-buffers', which runs `after-save-hook', so without this
+;; advice apheleia would reformat the buffer during every idle pause.
+;; `current-idle-time' is non-nil inside the idle auto-save timer but nil
+;; while a user save command is running, so skip formatting only for
+;; auto-saves.  A small threshold guards against edge cases where
+;; `current-idle-time' returns a zero-length value.
+(defun my-apheleia-skip-auto-save (orig-fun &rest args)
+  "Skip apheleia formatting when the save came from idle auto-save."
+  (if (and (current-idle-time)
+           (> (float-time (current-idle-time)) 0.05))
+      nil
+    (apply orig-fun args)))
+
 (with-eval-after-load 'apheleia
-  ;; `auto-save-visited-mode' (init-misc.el, 0.5s interval) saves through
-  ;; `save-some-buffers', which runs `after-save-hook', so without this
-  ;; advice apheleia would reformat the buffer during every idle pause.
-  ;; `current-idle-time' is non-nil inside the idle auto-save timer but nil
-  ;; while a user save command is running, so skip formatting only for
-  ;; auto-saves.  A small threshold guards against edge cases where
-  ;; `current-idle-time' returns a zero-length value.
-  (defun my-apheleia-skip-auto-save (orig-fun &rest args)
-    "Skip apheleia formatting when the save came from idle auto-save."
-    (if (and (current-idle-time)
-             (> (float-time (current-idle-time)) 0.05))
-        nil
-      (apply orig-fun args)))
-  (advice-add 'apheleia-format-after-save :around #'my-apheleia-skip-auto-save)
+  ;; Apheleia's after-save entry point is spelled `apheleia--format-after-save'
+  ;; in some versions and `apheleia-format-after-save' in others.  Advise
+  ;; whichever exists, and warn if neither does: advice on an undefined
+  ;; name is accepted silently and then never runs.
+  (let ((advised nil))
+    (dolist (function '(apheleia--format-after-save apheleia-format-after-save))
+      (when (fboundp function)
+        (advice-add function :around #'my-apheleia-skip-auto-save)
+        (setq advised t)))
+    (unless advised
+      (display-warning
+       'my-cpp
+       "Cannot find Apheleia's after-save function; idle auto-saves will reformat the buffer")))
 
   (setf (alist-get 'my-cpp-clang-format apheleia-formatters)
         my-cpp-clang-format-command)
@@ -1055,12 +1174,62 @@ bound by init-ide.el."
 (defun my-cpp-cppcheck ()
   "Run cppcheck on the current project with the GCC error template.
 The GCC-style template makes the messages clickable in the compilation
-buffer."
+buffer.  When the project root has a compile_commands.json, cppcheck
+analyses exactly the translation units in it, with their real defines and
+include paths; otherwise it scans the whole tree with a language standard
+guessed from the buffer.  The build directory is skipped either way."
   (interactive)
-  (my-cpp-compile-at
-   (my-cpp-project-root)
-   (concat "cppcheck --enable=all --inconclusive --std=c++17"
-           " --template=gcc --quiet .")))
+  (let* ((root (my-cpp-project-root))
+         (project-mode (file-readable-p
+                        (expand-file-name "compile_commands.json" root)))
+         (arguments
+          (append
+           (list "--enable=all" "--inconclusive" "--template=gcc" "--quiet"
+                 "--suppress=missingIncludeSystem"
+                 (concat "-i" my-cpp-build-directory))
+           (if project-mode
+               (list "--project=compile_commands.json")
+             (list (if (derived-mode-p 'c-mode 'c-ts-mode)
+                       "--std=c11"
+                     "--std=c++17")
+                   "."))
+           my-cpp-cppcheck-extra-args)))
+    (my-cpp-compile-at
+     root
+     (mapconcat #'shell-quote-argument (cons "cppcheck" arguments) " "))))
+
+;;; Header/source switching
+
+;; `ff-find-other-file' only looks in a few fixed directories, so it misses
+;; the counterpart in an include/ + src/ layout.  Teach it the common ones;
+;; `my-cpp-switch-source-header' asks clangd first and uses it as the fallback.
+(with-eval-after-load 'find-file
+  (dolist (directory '("../include" "../src" "../source"
+                       "../include/*" "../*/include" "../*/src"))
+    (add-to-list 'cc-search-directories directory t)))
+
+(defun my-cpp-switch-source-header ()
+  "Visit the header or source counterpart of the current file.
+Ask clangd (clangd's textDocument/switchSourceHeader request): it knows
+the compilation database, so it also works for trees that keep headers and
+sources apart.  Fall back to `ff-find-other-file' when no server is
+running, the request fails, or clangd finds nothing.  With a prefix
+argument, open the result in another window."
+  (interactive)
+  (let ((other (when (and buffer-file-name
+                          (fboundp 'eglot-current-server)
+                          (eglot-current-server))
+                 (ignore-errors
+                   (jsonrpc-request
+                    (eglot-current-server)
+                    :textDocument/switchSourceHeader
+                    (list :uri (eglot-path-to-uri buffer-file-name)))))))
+    (if (and (stringp other) (not (string-empty-p other)))
+        (let ((target (eglot-uri-to-path other)))
+          (if current-prefix-arg
+              (find-file-other-window target)
+            (find-file target)))
+      (call-interactively #'ff-find-other-file))))
 
 ;;; Existing buffers
 
@@ -1132,7 +1301,7 @@ buffer."
     "td" #'my-cpp-cmake-debug-test
     "tj" #'my-cpp-capture-compilation-database
     "tv" #'my-cpp-check-compilation-database
-    "th" #'ff-find-other-file
+    "th" #'my-cpp-switch-source-header
     "tw" #'my-cpp-write-clang-format))
 
 (my-cpp-configure-existing-buffers)
