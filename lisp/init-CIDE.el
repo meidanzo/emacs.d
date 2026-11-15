@@ -1,7 +1,7 @@
 ;;; init-CIDE.el --- personal C/C++ IDE setup  -*- lexical-binding: t; -*-
 ;;; Commentary:
-;; The C/C++ IDE layer: build system commands (CMake/Make/Meson/Ninja/
-;; xmake/Autotools/Bear), compile_commands.json management, Eglot +
+;; The C/C++ IDE layer: build system commands (CMake/Autotools/Make/
+;; Meson/Ninja/xmake/Bear), compile_commands.json management, Eglot +
 ;; clangd, apheleia + clang-format, cppcheck, and the C/C++-specific
 ;; "," leader keybindings.
 ;;
@@ -61,19 +61,23 @@ for example: (\"/usr/bin/arm-none-eabi-*\" \"/opt/toolchain/bin/*-g++\")."
   "Build system used by the common C/C++ commands.
 With `auto', choose a backend from the project files."
   :type '(choice (const :tag "Detect from project files" auto)
-                 (const cmake) (const make) (const meson)
-                 (const ninja) (const xmake) (const autotools)
-                 (const generic))
+                 (const cmake) (const autotools) (const make) (const meson)
+                 (const ninja) (const xmake) (const generic))
   :group 'my-cpp)
 
 (defcustom my-cpp-build-directory "build"
-  "Default out-of-source build directory for CMake, Meson, and Ninja."
+  "Default out-of-source build directory for CMake, Autotools, Meson, and Ninja."
   :type 'string
   :group 'my-cpp)
 
 (defcustom my-cpp-make-command "make"
   "Command used to build Makefile projects."
   :type 'string
+  :group 'my-cpp)
+
+(defcustom my-cpp-autotools-configure-options nil
+  "Extra arguments passed to an Autotools project's configure script."
+  :type '(repeat string)
   :group 'my-cpp)
 
 (defcustom my-cpp-ninja-command "ninja"
@@ -134,7 +138,7 @@ This is passed to the selected GDB or LLDB command."
 ;; Per-project overrides via .dir-locals.el (safe values only).
 (put 'my-cpp-build-system 'safe-local-variable
      (lambda (value)
-       (memq value '(auto cmake make meson ninja xmake autotools generic))))
+       (memq value '(auto cmake autotools make meson ninja xmake generic))))
 (put 'my-cpp-debugger 'safe-local-variable
      (lambda (value) (memq value '(gdb lldb))))
 
@@ -142,8 +146,8 @@ This is passed to the selected GDB or LLDB command."
 
 (defconst my-cpp-project-markers
   '("compile_commands.json" "CMakeLists.txt" "meson.build" "xmake.lua"
-    "GNUmakefile" "Makefile" "makefile" "build.ninja" "build/build.ninja"
-    "configure.ac" "Makefile.am")
+    "configure" "configure.ac" "configure.in" "Makefile.am" "autogen.sh"
+    "GNUmakefile" "Makefile" "makefile" "build.ninja" "build/build.ninja")
   "Files that identify a C/C++ project root.")
 
 (defconst my-cpp-modes '(c-mode c-ts-mode c++-mode c++-ts-mode objc-mode)
@@ -254,13 +258,14 @@ as a standalone project."
      ((file-exists-p (expand-file-name "CMakeLists.txt" root)) 'cmake)
      ((file-exists-p (expand-file-name "meson.build" root)) 'meson)
      ((file-exists-p (expand-file-name "xmake.lua" root)) 'xmake)
-     ;; Autotools: configure.ac (or a shipped configure script) plus the
-     ;; automake input files.  Checked before Make because the generated
-     ;; Makefile appears only after running ./configure.
-     ((and (or (file-exists-p (expand-file-name "configure.ac" root))
-               (file-exists-p (expand-file-name "configure" root)))
-           (or (file-exists-p (expand-file-name "Makefile.am" root))
-               (file-exists-p (expand-file-name "Makefile.in" root))))
+     ;; Autotools: a configure script (release tarballs) or the autoconf
+     ;; input files plus their bootstrap inputs.  Checked before Make
+     ;; because the generated Makefile appears only after ./configure.
+     ((or (file-exists-p (expand-file-name "configure" root))
+          (and (or (file-exists-p (expand-file-name "configure.ac" root))
+                   (file-exists-p (expand-file-name "configure.in" root)))
+               (or (file-exists-p (expand-file-name "Makefile.am" root))
+                   (file-exists-p (expand-file-name "autogen.sh" root)))))
       'autotools)
      ((or (file-exists-p (expand-file-name "GNUmakefile" root))
           (file-exists-p (expand-file-name "Makefile" root))
@@ -507,6 +512,55 @@ The result is always an expanded path (see `my-cpp-project-root')."
   (interactive)
   (my-cpp-compile-at (my-cpp-project-root) "xmake test"))
 
+;;; Autotools
+
+(defun my-cpp-autotools-build-directory ()
+  "Return the configured out-of-source Autotools build directory."
+  (expand-file-name my-cpp-build-directory (my-cpp-project-root)))
+
+(defun my-cpp-autotools-configure ()
+  "Run an Autotools project's bootstrap and configure steps.
+Use `autogen.sh' when the project has not generated its configure script."
+  (interactive)
+  (let* ((root (my-cpp-project-root))
+         (build-directory (my-cpp-autotools-build-directory))
+         (configure (expand-file-name "configure" root))
+         (autogen (expand-file-name "autogen.sh" root))
+         (options (mapconcat #'shell-quote-argument
+                             my-cpp-autotools-configure-options " ")))
+    (unless (or (file-executable-p configure)
+                (file-executable-p autogen))
+      (user-error "No executable configure or autogen.sh found in %s" root))
+    (my-cpp-compile-at
+     root
+     (string-join
+      (delq nil
+            (list (unless (file-executable-p configure)
+                    (concat "cd " (shell-quote-argument root)
+                            " && ./autogen.sh"))
+                  (concat "mkdir -p " (shell-quote-argument build-directory))
+                  (concat "cd " (shell-quote-argument build-directory))
+                  (concat (shell-quote-argument configure)
+                          (unless (string-empty-p options)
+                            (concat " " options)))))
+      " && "))))
+
+(defun my-cpp-autotools-build ()
+  "Build an Autotools project in its configured out-of-source directory."
+  (interactive)
+  (my-cpp-compile-at
+   (my-cpp-project-root)
+   (format "%s -C %s" my-cpp-make-command
+           (shell-quote-argument (my-cpp-autotools-build-directory)))))
+
+(defun my-cpp-autotools-test ()
+  "Run the standard Autotools test target in its build directory."
+  (interactive)
+  (my-cpp-compile-at
+   (my-cpp-project-root)
+   (format "%s -C %s check" my-cpp-make-command
+           (shell-quote-argument (my-cpp-autotools-build-directory)))))
+
 ;;; Make and Ninja
 
 (defun my-cpp-make-build ()
@@ -550,24 +604,6 @@ The result is always an expanded path (see `my-cpp-project-root')."
                             (shell-quote-argument build-directory)))))
     (my-cpp-compile-at root command)))
 
-;;; Autotools
-
-(defun my-cpp-autotools-configure ()
-  "Configure an Autotools project with ./configure.
-Runs ./autogen.sh first in repos that ship autogen.sh instead of a
-generated configure script (tmux does)."
-  (interactive)
-  (let* ((root (my-cpp-project-root))
-         (configure (expand-file-name "configure" root))
-         (autogen (expand-file-name "autogen.sh" root)))
-    (unless (or (file-exists-p configure) (file-exists-p autogen))
-      (user-error "No configure script or autogen.sh in %s" root))
-    (my-cpp-compile-at
-     root
-     (if (and (file-exists-p autogen) (not (file-exists-p configure)))
-         "./autogen.sh && ./configure"
-       "./configure"))))
-
 ;;; Generic commands
 
 (defun my-cpp-configure ()
@@ -575,9 +611,9 @@ generated configure script (tmux does)."
   (interactive)
   (pcase (my-cpp-current-build-system)
     ('cmake (my-cpp-cmake-configure))
+    ('autotools (my-cpp-autotools-configure))
     ('meson (my-cpp-meson-configure))
     ('xmake (my-cpp-xmake-configure))
-    ('autotools (my-cpp-autotools-configure))
     ((or 'make 'ninja)
      (message "This project is configured by its build files; use my-cpp-build."))
     (_ (user-error "No known build files found; use my-cpp-run-build-command"))))
@@ -587,9 +623,10 @@ generated configure script (tmux does)."
   (interactive)
   (pcase (my-cpp-current-build-system)
     ('cmake (my-cpp-cmake-build))
+    ('autotools (my-cpp-autotools-build))
     ('meson (my-cpp-meson-build))
     ('xmake (my-cpp-xmake-build))
-    ((or 'make 'autotools) (my-cpp-make-build))
+    ('make (my-cpp-make-build))
     ('ninja (my-cpp-ninja-build))
     (_ (my-cpp-run-build-command compile-command))))
 
@@ -601,12 +638,11 @@ generated configure script (tmux does)."
     (let ((system (my-cpp-current-build-system)))
       (pcase system
         ('cmake (my-cpp-cmake-test))
+        ('autotools (my-cpp-autotools-test))
         ('meson (my-cpp-meson-test))
         ('xmake (my-cpp-xmake-test))
         ('make (my-cpp-run-test-command
                 (read-string "Make test command: " "make test")))
-        ('autotools (my-cpp-run-test-command
-                     (read-string "Make test command: " "make check")))
         ('ninja
          (let* ((root (my-cpp-project-root))
                 (build-directory (my-cpp-ninja-build-directory))
@@ -662,7 +698,10 @@ SOURCE may be a build directory or a path to compile_commands.json."
   "Return a useful Bear command for the detected build system."
   (let ((root (my-cpp-project-root)))
     (pcase (my-cpp-current-build-system)
-      ((or 'make 'autotools) (concat "bear -- " my-cpp-make-command " -B"))
+      ('make (concat "bear -- " my-cpp-make-command " -B"))
+      ('autotools
+       (format "bear -- %s -B -C %s" my-cpp-make-command
+               (shell-quote-argument (my-cpp-autotools-build-directory))))
       ('ninja
        (let ((build-directory (my-cpp-ninja-build-directory)))
          (concat "bear -- " my-cpp-ninja-command
@@ -676,7 +715,7 @@ SOURCE may be a build directory or a path to compile_commands.json."
 (defun my-cpp-capture-compilation-database (command)
   "Generate or capture compile_commands.json for the current project.
 Use native database export for CMake, Meson, and xmake. COMMAND is used with
-Bear for Make, Ninja, and generic build commands."
+Bear for Autotools, Make, Ninja, and generic build commands."
   (interactive
    (if (memq (my-cpp-current-build-system) '(cmake meson xmake))
        (list nil)
