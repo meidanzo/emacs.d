@@ -669,6 +669,18 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "wf" 'popup-which-function)
 ;; }}
 
+;; dired runs in evil-emacs-state (special-mode maps to emacs in
+;; `my-initial-evil-state-per-major-mode'), where the comma leader is not
+;; active and "," resolves to `undefined'.  Reuse the same leader map in
+;; dired's emacs-state auxiliary map: general extends the map in place,
+;; so keys added later by the language layers are visible here too.
+;; Other emacs-state modes are left alone because "," inserts itself
+;; there (shell, term, vterm, ...).
+(let ((leader (lookup-key evil-normal-state-map ",")))
+  (when (keymapp leader)
+    (require 'dired)
+    (evil-define-key 'emacs dired-mode-map "," leader)))
+
 ;; {{ Use `SPC` as leader key
 ;; all keywords arguments are still supported
 (general-create-definer my-space-leader-def
