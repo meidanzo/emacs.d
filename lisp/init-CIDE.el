@@ -195,7 +195,8 @@ This is passed to the selected GDB or LLDB command."
 ;; names).  These helpers find them instead.
 (defun my-cpp-qmake-project-file (directory)
   "Return the .pro project file directly in DIRECTORY, or nil.
-With several .pro files, the first in alphabetical order wins.
+With several .pro files, the first in alphabetical order wins
+(`directory-files' sorts when called without a NOSORT argument).
 Errors (an unreadable ancestor) mean \"no .pro file here\" because this
 also runs on the `project-current' path."
   (car (ignore-errors (directory-files directory t "\\.pro\\'"))))
@@ -872,7 +873,10 @@ json.el on the multi-megabyte databases of large projects.  The native
 parser interns alist keys on some builds and returns strings on others,
 so the keys are normalized to symbols here; callers use one form."
   (let ((data
-         (if (fboundp 'json-parse-buffer)
+         (if (and (fboundp 'json-parse-buffer)
+                  ;; The C parser can be absent at link time even when the
+                  ;; function exists; probe it for real before relying on it.
+                  (ignore-errors (json-parse-string "[]") t))
              (with-temp-buffer
                (insert-file-contents file)
                (json-parse-buffer :object-type 'alist :array-type 'list

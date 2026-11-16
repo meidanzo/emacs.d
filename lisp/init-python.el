@@ -32,6 +32,10 @@
 ;; - `my-ide-register' from init-ide.el (loaded after this file)
 ;; - `my-comma-leader-def' from init-evil.el (requires evil)
 ;; - company, apheleia (from init-elpa.el); Eglot is built in
+;; - `my-ensure' (installs and loads a package on demand) is optional: a
+;;   plain `require' of pyvenv is used when it is not defined
+;; - `my-python-langserver-exist' is optional: a built-in check for the
+;;   language servers listed under LSP is used when it is not defined
 ;;; Code:
 
 (require 'project)
@@ -67,6 +71,16 @@
   ;; Reapply when opening Python after init-essential imports shell PATH.
   (add-hook hook #'my-python-add-local-bin-to-path -100))
 
+(defun my-python--plain-file-buffer-p ()
+  "Return non-nil when the current buffer visits a real Python file.
+Temporary buffers and Python embedded in an Org file (the Org source-edit
+buffer visits the .org file) are not real Python files: language servers
+and electric-indent tweaks must leave them alone."
+  (and buffer-file-name
+       (not (and (fboundp 'my-buffer-file-temp-p)
+                 (my-buffer-file-temp-p)))
+       (not (equal (file-name-extension buffer-file-name) "org"))))
+
 ;;; Project detection
 
 (defconst my-python-project-markers
@@ -88,9 +102,12 @@
 ;; case.
 (defun my-python-project-try-local (directory)
   "Recognize a Python project by its files when no VC root exists.
-Return a transient project rooted at the outermost marker below
-DIRECTORY, or nil when DIRECTORY is under version control."
-  (unless (ignore-errors (vc-responsible-backend directory))
+Return a transient project rooted at the nearest ancestor of DIRECTORY
+that holds a marker, or nil when DIRECTORY is under version control or on
+a remote host.  Remote directories are skipped because this runs on every
+`project-current' call and each marker probe would be a round trip."
+  (unless (or (file-remote-p directory)
+              (ignore-errors (vc-responsible-backend directory)))
     (let ((roots (delq nil
                        (mapcar (lambda (marker)
                                  (locate-dominating-file directory marker))
@@ -109,12 +126,10 @@ DIRECTORY, or nil when DIRECTORY is under version control."
 ;; global `setq' cannot remove it.  Do it in a hook instead.
 (defun my-python-disable-colon-electric-indent ()
   "Remove `:' from `electric-indent-chars' in this Python buffer."
-  (unless (or (and (fboundp 'my-buffer-file-temp-p)
-                   (my-buffer-file-temp-p))
-              (not buffer-file-name)
-              ;; embed python code in org file
-              (string= (file-name-extension buffer-file-name) "org"))
-    (setq-local electric-indent-chars (delq ?: electric-indent-chars))))
+  (when (my-python--plain-file-buffer-p)
+    ;; `remq', not `delq': the list can share structure with the global
+    ;; default, and `delq' would modify it in place.
+    (setq-local electric-indent-chars (remq ?: electric-indent-chars))))
 
 (defun my-python-style-setup ()
   "Four-space indentation and no tabs in the current Python buffer.
@@ -178,6 +193,12 @@ The environment is activated only when it already exists."
                (cons (my-python--project-venv)
                      (mapcar #'expand-file-name my-python-venv-directories)))))
 
+(defun my-python--ensure-pyvenv ()
+  "Make sure the pyvenv package is loaded, installing it when possible."
+  (cond ((fboundp 'my-ensure) (my-ensure 'pyvenv))
+        ((require 'pyvenv nil t))
+        (t (user-error "The pyvenv package is not installed"))))
+
 (defun my-activate-python-venv (directory)
   "Activate the Python virtual environment in DIRECTORY.
 DIRECTORY can be created by `uv venv' or `python -m venv'."
@@ -187,7 +208,7 @@ DIRECTORY can be created by `uv venv' or `python -m venv'."
                                (or (my-python--project-venv)
                                    (car (my-python--venv-candidates)))
                                nil t))))
-  (my-ensure 'pyvenv)
+  (my-python--ensure-pyvenv)
   (unless (stringp directory)
     (user-error "No Python venv directory specified"))
   (setq directory (expand-file-name directory))
@@ -203,7 +224,7 @@ Use `uv venv' when uv is available, otherwise fall back to
 `python3 -m venv'.  Interactively, DIRECTORY defaults to the
 current project's .venv directory."
   (interactive)
-  (my-ensure 'pyvenv)
+  (my-python--ensure-pyvenv)
   (let* ((directory (expand-file-name
                      (or directory
                          (read-directory-name "Create Python venv: "
@@ -289,9 +310,18 @@ With prefix argument CREATE, create a new environment instead."
            ("pyright-langserver" "--stdio")
            "pylsp"))))
 
+(defun my-python--langserver-installed-p ()
+  "Return non-nil when one of the language servers Eglot may use exists."
+  (cl-some #'executable-find
+           '("basedpyright-langserver" "pyrefly" "pyright-langserver" "pylsp")))
+
 (defun my-python-eglot-ensure ()
-  "Start Eglot when a Python language server is installed."
-  (when (my-python-langserver-exist)
+  "Start Eglot when a Python language server is installed.
+Skips temporary buffers and Python embedded in Org files."
+  (when (and (my-python--plain-file-buffer-p)
+             (if (fboundp 'my-python-langserver-exist)
+                 (my-python-langserver-exist)
+               (my-python--langserver-installed-p)))
     (eglot-ensure)))
 
 (dolist (hook my-python-mode-hooks)
@@ -349,9 +379,10 @@ venv's interpreter wins; fall back to the name `python3'."
   "Run the current Python script in a compilation (comint) buffer.
 With prefix argument ARGS, prompt for extra script arguments."
   (interactive "P")
-  (unless (and buffer-file-name
-               (string-suffix-p ".py" buffer-file-name t))
-    (user-error "Current buffer is not a Python script"))
+  ;; The key is bound only in Python buffers, so any visited file will do;
+  ;; requiring a .py suffix would reject shebang scripts such as bin/tool.
+  (unless buffer-file-name
+    (user-error "Current buffer is not visiting a Python script"))
   (let ((default-directory (or (my-python--project-root) default-directory)))
     (compile (concat (shell-quote-argument (my-python-program))
                      " -B "
@@ -360,14 +391,31 @@ With prefix argument ARGS, prompt for extra script arguments."
                        (concat " " (read-string "Script arguments: "))))
              t)))
 
+(defcustom my-python-check-exclude-regexp
+  "(^|/)(\\.venv|venv|env|\\.tox|\\.git|node_modules|build|dist|site-packages)(/|$)"
+  "Paths `my-python-check' skips, as a Python regular expression.
+Python searches it in the full path of every file it considers."
+  :type 'regexp
+  :group 'python)
+
 (defun my-python-check ()
   "Syntax-check every Python file in the project with `compileall'.
-The .venv directory is excluded; only files with syntax errors are
-reported."
+Only files with syntax errors are reported.  `compileall' writes bytecode,
+so the interpreter is told to put it in a scratch tree under the temporary
+directory (`-X pycache_prefix'): the check leaves no __pycache__ directories
+in the project.  Paths matching `my-python-check-exclude-regexp' (virtual
+environments, caches, build output) are skipped."
   (interactive)
   (let ((default-directory (or (my-python--project-root) default-directory)))
     (compile (concat (shell-quote-argument (my-python-program))
-                     " -m compileall -q -x '\\.venv' .")
+                     " -X "
+                     (shell-quote-argument
+                      (concat "pycache_prefix="
+                              (expand-file-name "emacs-python-check"
+                                                temporary-file-directory)))
+                     " -m compileall -q -x "
+                     (shell-quote-argument my-python-check-exclude-regexp)
+                     " .")
              t)))
 
 (defun my-python-lint ()
@@ -378,7 +426,10 @@ bound by init-ide.el."
   (unless (executable-find "ruff")
     (user-error "ruff is not installed"))
   (let ((default-directory (or (my-python--project-root) default-directory)))
-    (compile "ruff check ." t)))
+    ;; The concise format is one `file:line:col: CODE message' line per
+    ;; finding, which `compilation-mode' always makes clickable; ruff's
+    ;; default multi-line format has changed between releases.
+    (compile "ruff check --output-format=concise ." t)))
 
 (defun my-python-format ()
   "Format the current Python buffer with apheleia (ruff).
@@ -389,26 +440,47 @@ bound by init-ide.el."
       (call-interactively #'apheleia-format-buffer)
     (user-error "apheleia is not available; cannot format the buffer")))
 
+(defun my-python--module-available-p (module)
+  "Return non-nil when the project's Python interpreter can import MODULE.
+Uses `importlib.util.find_spec', so MODULE is located without importing it.
+A missing interpreter counts as \"not available\" instead of signalling."
+  (eq 0 (ignore-errors
+          (call-process
+           (my-python-program) nil nil nil "-c"
+           (format "import importlib.util,sys;sys.exit(importlib.util.find_spec(%S) is None)"
+                   module)))))
+
 (defun my-python-test (&optional args)
   "Run the project's tests with `python -m pytest'.
 With prefix argument ARGS, prompt for extra pytest arguments.
 This is the Python implementation behind the shared `,nt' test key
 bound by init-ide.el."
   (interactive "P")
-  (unless (executable-find "pytest")
-    (user-error "pytest is not installed"))
   (let ((default-directory (or (my-python--project-root) default-directory)))
+    ;; Ask the interpreter that will run the tests, not the PATH: a
+    ;; pytest executable elsewhere says nothing about this environment.
+    (unless (my-python--module-available-p "pytest")
+      (user-error "pytest is not installed for %s" (my-python-program)))
     (compile (concat (shell-quote-argument (my-python-program))
                      " -m pytest"
                      (when args
                        (concat " " (read-string "pytest arguments: "))))
              t)))
 
+(defun my-python--pip-command ()
+  "Return the shell command prefix that installs packages (without `install').
+Prefer `uv pip': environments created by `uv venv' contain no pip, so
+`python -m pip' fails there, while `uv pip' works in every environment,
+and refuses to touch the system Python when none is active."
+  (if (executable-find "uv")
+      "uv pip"
+    (concat (shell-quote-argument (my-python-program)) " -m pip")))
+
 (defun my-python-update-deps ()
   "Update the project's dependencies.
-Use `uv sync' when the project has a pyproject.toml and uv is
-installed, otherwise `python -m pip install -r requirements.txt' or
-`python -m pip install -e .'."
+Use `uv sync' when the project has a pyproject.toml and uv is installed,
+otherwise install from requirements.txt or the project itself (`-e .')
+with `uv pip' or `python -m pip'."
   (interactive)
   (let* ((root (or (my-python--project-root) default-directory))
          (pyproject (expand-file-name "pyproject.toml" root))
@@ -418,17 +490,19 @@ installed, otherwise `python -m pip install -r requirements.txt' or
      ((and (file-exists-p pyproject) (executable-find "uv"))
       (compile "uv sync" t))
      ((file-exists-p requirements)
-      (compile (concat (shell-quote-argument (my-python-program))
-                       " -m pip install -r requirements.txt") t))
+      (compile (concat (my-python--pip-command)
+                       " install -r requirements.txt")
+               t))
      ((file-exists-p pyproject)
-      (compile (concat (shell-quote-argument (my-python-program))
-                       " -m pip install -e .") t))
+      (compile (concat (my-python--pip-command) " install -e .") t))
      (t (user-error "No pyproject.toml or requirements.txt in %s" root)))))
 
 (defun my-python-add-dep (package)
-  "Add PACKAGE as a dependency with `uv add' or `python -m pip install'."
-  (interactive (list (read-string "Package to add: ")))
-  (when (string-empty-p package)
+  "Add PACKAGE as a dependency with `uv add', `uv pip' or `python -m pip'.
+PACKAGE may carry more names or options, for example \"requests flask\"
+or \"--dev pytest\"; each word is passed to the tool as one argument."
+  (interactive (list (read-string "Package to add (and options): ")))
+  (when (string-empty-p (string-trim package))
     (user-error "Enter a package name, for example requests"))
   (let* ((root (or (my-python--project-root) default-directory))
          (pyproject (expand-file-name "pyproject.toml" root))
@@ -436,25 +510,50 @@ installed, otherwise `python -m pip install -r requirements.txt' or
     (compile (concat (if (and (file-exists-p pyproject)
                               (executable-find "uv"))
                          "uv add"
-                       (concat (shell-quote-argument (my-python-program))
-                               " -m pip install"))
+                       (concat (my-python--pip-command) " install"))
                      " "
-                     (shell-quote-argument package))
+                     (mapconcat #'shell-quote-argument
+                                (split-string-and-unquote package) " "))
              t)))
+
+(defcustom my-python-clean-skipped-directories
+  '(".git" ".venv" "venv" "env" ".tox" "node_modules")
+  "Directory names `my-python-clean' does not descend into.
+Environments and tool caches hold __pycache__ directories that are not
+the project's build output, and walking them is slow."
+  :type '(repeat string)
+  :group 'python)
 
 (defun my-python-clean ()
   "Delete __pycache__ directories under the project root.
 __pycache__ is Python's build artifact directory; this matches the
-build-artifact cleanup of the other language layers (cargo clean)."
+build-artifact cleanup of the other language layers (cargo clean).
+Directories named in `my-python-clean-skipped-directories' are left alone.
+Outside a recognized project the search starts at the current directory,
+so confirm before deleting."
   (interactive)
-  (let* ((root (or (my-python--project-root) default-directory))
-         (count 0))
-    (dolist (directory (directory-files-recursively root "__pycache__" t))
-      (when (file-directory-p directory)
-        (delete-directory directory t)
-        (cl-incf count)))
-    (message "Deleted %d __pycache__ director%s" count
-             (if (= count 1) "y" "ies"))))
+  (let* ((project-root (my-python--project-root))
+         (root (or project-root default-directory))
+         (directories
+          (directory-files-recursively
+           root "\\`__pycache__\\'" t
+           (lambda (directory)
+             (not (member (file-name-nondirectory
+                           (directory-file-name directory))
+                          my-python-clean-skipped-directories))))))
+    (setq directories (seq-filter #'file-directory-p directories))
+    (cond
+     ((null directories)
+      (message "No __pycache__ directories under %s" root))
+     ((or project-root
+          (y-or-n-p (format "Delete %d __pycache__ director%s under %s (not a recognized project)? "
+                            (length directories)
+                            (if (= (length directories) 1) "y" "ies")
+                            root)))
+      (dolist (directory directories)
+        (delete-directory directory t))
+      (message "Deleted %d __pycache__ director%s" (length directories)
+               (if (= (length directories) 1) "y" "ies"))))))
 
 (defun my-python-pydoc (symbol)
   "Show SYMBOL's documentation with `python -m pydoc'.
@@ -496,9 +595,12 @@ the default.  This is the Python implementation behind the shared
   (unless (file-exists-p script)
     (user-error "No such script: %s" script))
   (require 'gud)
-  (pdb (concat (shell-quote-argument (my-python-program))
-               " -m pdb "
-               (shell-quote-argument script))))
+  ;; `pdb' splits its command line with `split-string-and-unquote', which
+  ;; understands double quotes but not shell backslash escapes;
+  ;; `combine-and-quote-strings' is its inverse, so a path containing
+  ;; spaces survives the round trip.
+  (pdb (combine-and-quote-strings
+        (list (my-python-program) "-m" "pdb" script))))
 
 ;;; Shared operations
 
