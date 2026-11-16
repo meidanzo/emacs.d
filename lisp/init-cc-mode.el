@@ -11,6 +11,12 @@
 
 (require 'google-c-style)
 
+;; Tip 1: use more popular style "linux" instead of "gnu",
+;;
+;;   (setq c-default-style '((java-mode . "java")
+;;                           (awk-mode . "awk")
+;;                           (other . "linux")))
+
 ;;; C/C++: cc-mode
 
 (defun my-common-cc-mode-setup ()
@@ -57,7 +63,7 @@
 
 ;;; CMake
 
-(defun my/cmake-mode-imenu-setup ()
+(defun my-cmake-mode-imenu-setup ()
   "Imenu setup for `cmake-mode' and `cmake-ts-mode'.
 cmake-ts-mode has no built-in imenu rules, so the same regex-based
 index is installed for both modes.  Use `setq-local' so the value
@@ -68,8 +74,7 @@ stays in the buffer instead of clobbering the global default."
                 ("Targets"   "^\\s-*add_\\(?:executable\\|library\\)\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1)
                 ("Options"   "^\\s-*option\\s-*(\\s-*\\([a-zA-Z0-9_]+\\)" 1))))
 
-(add-hook 'cmake-mode-hook #'my/cmake-mode-imenu-setup)
-(add-hook 'cmake-ts-mode-hook #'my/cmake-mode-imenu-setup)
-
+(add-hook 'cmake-mode-hook #'my-cmake-mode-imenu-setup)
+(add-hook 'cmake-ts-mode-hook #'my-cmake-mode-imenu-setup)
 (provide 'init-cc-mode)
 ;;; init-cc-mode.el ends here

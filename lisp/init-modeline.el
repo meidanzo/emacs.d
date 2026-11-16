@@ -3,6 +3,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 ;; @see http://emacs-fu.blogspot.com/2011/08/customizing-mode-line.html
 ;; @see http://www.delorie.com/gnu/docs/elisp-manual-21/elisp_360.html
 ;; use setq-default to set it for /all/ modes
@@ -186,8 +188,7 @@ the second character is the work-tree status."
 
    (:eval my-extra-mode-line-info)
 
-   mode-line-end-spaces
-   ))
+   mode-line-end-spaces))
 
 (with-eval-after-load 'time
   ;; Donot show system load in mode line
@@ -198,3 +199,4 @@ the second character is the work-tree status."
   (setq display-time-mail-function (lambda () nil)))
 
 (provide 'init-modeline)
+;;; init-modeline.el ends here
