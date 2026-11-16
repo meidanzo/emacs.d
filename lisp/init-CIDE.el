@@ -313,9 +313,11 @@ as a standalone project."
     (while (and directory (not root))
       (if (my-cpp-cmake-declares-project-p directory)
           (setq root directory)
-        (let ((parent (file-name-directory
-                       (directory-file-name directory))))
-          (setq directory (unless (equal parent directory)
+        ;; Expand first: `locate-dominating-file' abbreviates $HOME to ~, and
+        ;; `file-name-directory' of "~" is nil.
+        (let* ((current (file-name-as-directory (expand-file-name directory)))
+               (parent (file-name-directory (directory-file-name current))))
+          (setq directory (unless (or (null parent) (equal parent current))
                             (locate-dominating-file parent "CMakeLists.txt"))))))
     (or (when root (expand-file-name root))
         (expand-file-name
@@ -1126,35 +1128,10 @@ The project's .clang-format wins; without one, fall back to Google style
 with four-space indentation, matching `c-basic-offset' and
 `c-ts-mode-indent-offset'.")
 
-;; `auto-save-visited-mode' (init-misc.el, 0.5s interval) saves through
-;; `save-some-buffers', which runs `after-save-hook', so without this
-;; advice apheleia would reformat the buffer during every idle pause.
-;; `current-idle-time' is non-nil inside the idle auto-save timer but nil
-;; while a user save command is running, so skip formatting only for
-;; auto-saves.  A small threshold guards against edge cases where
-;; `current-idle-time' returns a zero-length value.
-(defun my-apheleia-skip-auto-save (orig-fun &rest args)
-  "Skip apheleia formatting when the save came from idle auto-save."
-  (if (and (current-idle-time)
-           (> (float-time (current-idle-time)) 0.05))
-      nil
-    (apply orig-fun args)))
+;; Skipping Apheleia on idle auto-saves is handled for every language
+;; layer by `my-apheleia-skip-auto-save' in init-ide.el.
 
 (with-eval-after-load 'apheleia
-  ;; Apheleia's after-save entry point is spelled `apheleia--format-after-save'
-  ;; in some versions and `apheleia-format-after-save' in others.  Advise
-  ;; whichever exists, and warn if neither does: advice on an undefined
-  ;; name is accepted silently and then never runs.
-  (let ((advised nil))
-    (dolist (function '(apheleia--format-after-save apheleia-format-after-save))
-      (when (fboundp function)
-        (advice-add function :around #'my-apheleia-skip-auto-save)
-        (setq advised t)))
-    (unless advised
-      (display-warning
-       'my-cpp
-       "Cannot find Apheleia's after-save function; idle auto-saves will reformat the buffer")))
-
   (setf (alist-get 'my-cpp-clang-format apheleia-formatters)
         my-cpp-clang-format-command)
   (dolist (mode my-cpp-modes)

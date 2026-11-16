@@ -250,6 +250,39 @@ A second registration for the same MODES replaces the first."
     (setq flycheck-global-modes
           (my-ide-flycheck-modes-excluding flycheck-global-modes modes))))
 
+;;; Apheleia and idle auto-save
+
+;; `auto-save-visited-mode' (init-misc.el, 0.5s interval) saves through
+;; `save-some-buffers', which runs `after-save-hook', so without this
+;; advice apheleia would reformat the buffer during every idle pause.
+;; `current-idle-time' is non-nil inside the idle auto-save timer but nil
+;; while a user save command is running, so skip formatting only for
+;; auto-saves.  A small threshold guards against edge cases where
+;; `current-idle-time' returns a zero-length value.  This is language
+;; neutral (every layer formats through apheleia), so it lives here
+;; rather than in one language layer.
+(defun my-apheleia-skip-auto-save (orig-fun &rest args)
+  "Skip apheleia formatting when the save came from idle auto-save."
+  (if (and (current-idle-time)
+           (> (float-time (current-idle-time)) 0.05))
+      nil
+    (apply orig-fun args)))
+
+(with-eval-after-load 'apheleia
+  ;; Apheleia's after-save entry point is spelled `apheleia--format-after-save'
+  ;; in some versions and `apheleia-format-after-save' in others.  Advise
+  ;; whichever exists, and warn if neither does: advice on an undefined
+  ;; name is accepted silently and then never runs.
+  (let ((advised nil))
+    (dolist (function '(apheleia--format-after-save apheleia-format-after-save))
+      (when (fboundp function)
+        (advice-add function :around #'my-apheleia-skip-auto-save)
+        (setq advised t)))
+    (unless advised
+      (display-warning
+       'my-ide
+       "Cannot find Apheleia's after-save function; idle auto-saves will reformat the buffer"))))
+
 ;;; Keybindings
 
 ;; The shared operations dispatch on the current buffer's language.

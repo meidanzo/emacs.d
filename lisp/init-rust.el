@@ -35,7 +35,9 @@
 ;; - `my-buffer-file-temp-p' from init-utils.el
 ;; - `my-comma-leader-def' from init-evil.el (requires evil)
 ;; - `my-rust-langserver-exist' from init-tree-sitter.el
-;; - `my-ide-register', `my-ide-flycheck-exclude' from init-ide.el
+;; - `my-ide-register', `my-ide-register-company-backends',
+;;   `my-ide-flycheck-exclude' and the Apheleia idle-auto-save advice
+;;   (`my-apheleia-skip-auto-save') from init-ide.el
 ;; - company, flycheck, apheleia (from init-elpa.el); Eglot is built in
 ;;
 ;; Section overview:
@@ -78,6 +80,58 @@ The plain `gdb' and `lldb' choices use the system debuggers directly."
 
 (put 'my-rust-debugger 'safe-local-variable
      (lambda (value) (memq value '(rust-gdb rust-lldb gdb lldb))))
+
+(defcustom my-rust-analyzer-options
+  '(:check (:command "clippy")
+    :cargo (:targetDir t))
+  "Options sent to rust-analyzer as Eglot's :initializationOptions.
+A plist in rust-analyzer's own (nested) configuration layout.
+
+`:check (:command \"clippy\")' runs clippy instead of plain `cargo check'
+on save, so every save reports both compiler errors and clippy lints.
+
+`:cargo (:targetDir t)' makes rust-analyzer build into its own
+target/rust-analyzer directory.  Without it, the check that runs on every
+save holds cargo's lock on target/, so a `cargo run' or `cargo test'
+started from Emacs (which itself saves the buffers first) waits for it.
+The price is some duplicated build output; remove the entry to share
+target/ again.
+
+The value is read each time a server starts, so it can be set per project
+in .dir-locals.el, for example to pass `:cargo (:features \"all\")' or a
+cross-compilation `:cargo (:target \"thumbv7em-none-eabihf\")'."
+  :type 'sexp
+  :group 'tools)
+
+(defcustom my-rust-eglot-skip-regexp
+  "/\\.cargo/\\(?:registry\\|git\\)/\\|/\\.rustup/"
+  "Rust files whose name matches this never start an Eglot server of their own.
+Downloaded crate sources and the toolchain's sources are Cargo projects,
+so opening one would start another rust-analyzer for every crate visited,
+for instance via go-to-definition.  They are served by the server of the
+project you came from instead (`eglot-extend-to-xref', set in
+init-ide.el).  Nil disables the check."
+  :type '(choice (const :tag "Never skip" nil) regexp)
+  :group 'tools)
+
+(defcustom my-rust-cargo-markers-override-vc t
+  "Non-nil: a Cargo.toml nearer than the VC root defines the project root.
+This registers Cargo.toml and Cargo.lock in `project-vc-extra-root-markers'.
+It also makes every member crate of a Cargo workspace a project of its own,
+because the nearest marker wins over the VC root, and Eglot starts one
+rust-analyzer per project, so a large workspace costs one server per
+member crate you visit.
+
+Nil: Cargo.toml only matters in directories without a VC root, where
+`my-rust-project-try-local' picks the workspace root.  A workspace in a
+repository is then one project with one server.  rust-analyzer finds
+manifests in the project root, its parents and its direct subdirectories,
+so a crate nested deeper than that is not found by itself.
+
+Set this before init-rust.el loads (for example with `setq' in init.el);
+it is read once, when `project' loads."
+  :type 'boolean
+  :group 'tools)
 
 ;;; Style / indentation
 
@@ -122,10 +176,60 @@ The plain `gdb' and `lldb' choices use the system debuggers directly."
 ;;; Project detection
 
 ;; Make project.el (and with it Eglot, ffip, and xref) recognize Rust
-;; projects that are not under version control.
+;; projects that are not under version control.  See
+;; `my-rust-cargo-markers-override-vc' for the two ways of doing it.
+
+;; Manifest helpers.  Paths are expanded first: `locate-dominating-file'
+;; abbreviates $HOME to ~, and `file-name-directory' of "~" is nil, which
+;; would break the climb for a Cargo.toml in the home directory.
+(defun my-rust--parent-manifest-directory (directory)
+  "Return the nearest ancestor of DIRECTORY holding a Cargo.toml, or nil.
+DIRECTORY itself is not considered."
+  (let* ((directory (file-name-as-directory (expand-file-name directory)))
+         (parent (file-name-directory (directory-file-name directory))))
+    (when (and parent (not (equal parent directory)))
+      (when-let* ((found (locate-dominating-file parent "Cargo.toml")))
+        (expand-file-name found)))))
+
+(defun my-rust--manifest-declares-workspace-p (directory)
+  "Return non-nil when DIRECTORY's Cargo.toml has a [workspace] table."
+  (let ((file (expand-file-name "Cargo.toml" directory)))
+    (and (file-readable-p file)
+         (with-temp-buffer
+           (insert-file-contents file)
+           (re-search-forward "^\\[workspace[].]" nil t)))))
+
+(defun my-rust-workspace-root (directory)
+  "Return the Cargo project root for DIRECTORY, or nil outside any crate.
+That is the outermost ancestor whose Cargo.toml declares a [workspace];
+without one, the directory of the nearest Cargo.toml."
+  (let* ((nearest (when-let* ((found (locate-dominating-file
+                                      directory "Cargo.toml")))
+                    (expand-file-name found)))
+         (current nearest)
+         workspace)
+    (while current
+      (when (my-rust--manifest-declares-workspace-p current)
+        (setq workspace current))
+      (setq current (my-rust--parent-manifest-directory current)))
+    (or workspace nearest)))
+
+(defun my-rust-project-try-local (directory)
+  "Recognize a Cargo project in DIRECTORY when no VC root exists.
+Return a transient project rooted at the Cargo workspace root, or nil when
+DIRECTORY is under version control, on a remote host, or outside a crate.
+Remote directories are skipped because this runs on every
+`project-current' call."
+  (unless (or (file-remote-p directory)
+              (ignore-errors (vc-responsible-backend directory)))
+    (when-let* ((root (my-rust-workspace-root directory)))
+      (cons 'transient root))))
+
 (with-eval-after-load 'project
-  (dolist (marker '("Cargo.toml" "Cargo.lock"))
-    (add-to-list 'project-vc-extra-root-markers marker)))
+  (if my-rust-cargo-markers-override-vc
+      (dolist (marker '("Cargo.toml" "Cargo.lock"))
+        (add-to-list 'project-vc-extra-root-markers marker))
+    (add-hook 'project-find-functions #'my-rust-project-try-local t)))
 
 (defun my-rust-project-root ()
   "Return the current Rust project root directory.
@@ -164,23 +268,34 @@ only that crate)."
 
 ;;; LSP: Eglot + rust-analyzer
 
+(defun my-rust-analyzer-contact (&rest _)
+  "Return the rust-analyzer command line for Eglot.
+Eglot calls this each time it starts a server (the extra arguments it may
+pass are ignored), so changes to `my-rust-analyzer-options' -- including
+directory-local values -- apply to the next server."
+  (list "rust-analyzer" :initializationOptions my-rust-analyzer-options))
+
 (with-eval-after-load 'eglot
   ;; `setf' + `alist-get' with `equal' replaces an entry when one exists
   ;; (newer Emacs versions ship a rust-analyzer entry) and adds it
-  ;; otherwise, so this never duplicates.
-  ;; `check.command' runs clippy instead of plain `cargo check' on save,
-  ;; so every save reports both compiler errors and clippy lints.
+  ;; otherwise, so this never duplicates.  The contact is a function so it
+  ;; is evaluated when a server starts, not once when Eglot loads.
   (setf (alist-get my-rust-modes eglot-server-programs nil nil 'equal)
-        '("rust-analyzer"
-          :initializationOptions (:check (:command "clippy")))))
+        #'my-rust-analyzer-contact))
 
 (defun my-rust-eglot-ensure ()
   "Start Eglot in a Rust buffer, skipping temporary buffers.
 Also skipped when rust-analyzer is not installed, so that editing
-still works with dabbrev-based completion alone."
-  (unless (and (fboundp 'my-buffer-file-temp-p)
-               (my-buffer-file-temp-p))
-    (when (my-rust-langserver-exist)
+still works with dabbrev-based completion alone, and for downloaded
+crate and toolchain sources (see `my-rust-eglot-skip-regexp')."
+  (unless (or (and (fboundp 'my-buffer-file-temp-p)
+                   (my-buffer-file-temp-p))
+              (and my-rust-eglot-skip-regexp
+                   buffer-file-name
+                   (string-match-p my-rust-eglot-skip-regexp buffer-file-name)))
+    (when (if (fboundp 'my-rust-langserver-exist)
+              (my-rust-langserver-exist)
+            (executable-find "rust-analyzer"))
       (eglot-ensure))))
 
 (dolist (hook my-rust-mode-hooks)
@@ -217,36 +332,45 @@ still works with dabbrev-based completion alone."
 ;; formatter, but that formatter feeds the buffer through stdin, where
 ;; rustfmt defaults to edition 2015 and rejects modern syntax (`async
 ;; fn', ...).  Pass the edition declared by the project's Cargo.toml.
+(defun my-rust--manifest-edition (directory)
+  "Return the edition declared in DIRECTORY's Cargo.toml, or nil.
+`edition.workspace = true' does not match: it has no value to read."
+  (let ((file (expand-file-name "Cargo.toml" directory)))
+    (when (file-readable-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (goto-char (point-min))
+        ;; Anchor to a line start so a commented-out `# edition = ...'
+        ;; line is not matched, and accept TOML literal single quotes.
+        (when (re-search-forward
+               "^edition\\s-*=\\s-*[\"']\\([0-9]+\\)[\"']" nil t)
+          (match-string 1))))))
+
 (defun my-rust-cargo-edition ()
   "Return the Rust edition declared near the current buffer, or nil.
 Searches the nearest Cargo.toml first, then parent directories, so
 `edition.workspace = true' in a workspace member resolves through the
 workspace root."
-  (when-let* ((dir (locate-dominating-file default-directory "Cargo.toml")))
-    (let ((directory dir)
-          edition)
-      (while (and directory (not edition))
-        (with-temp-buffer
-          (insert-file-contents (expand-file-name "Cargo.toml" directory))
-          (goto-char (point-min))
-          ;; Anchor to a line start so a commented-out `# edition = ...'
-          ;; line is not matched, and accept TOML literal single quotes.
-          (when (re-search-forward
-                 "^edition\\s-*=\\s-*[\"']\\([0-9]+\\)[\"']" nil t)
-            (setq edition (match-string 1))))
-        (let ((parent (file-name-directory
-                       (directory-file-name directory))))
-          (setq directory (unless (equal parent directory)
-                            (locate-dominating-file
-                             parent "Cargo.toml")))))
-      edition)))
+  (let ((directory (when-let* ((found (locate-dominating-file
+                                       default-directory "Cargo.toml")))
+                     (expand-file-name found)))
+        edition)
+    (while (and directory (not edition))
+      (setq edition (my-rust--manifest-edition directory))
+      (unless edition
+        (setq directory (my-rust--parent-manifest-directory directory))))
+    edition))
 
 (with-eval-after-load 'apheleia
   (setf (alist-get 'rustfmt apheleia-formatters)
         '("rustfmt" "--quiet" "--emit" "stdout" "--edition"
           ;; Evaluated in the buffer being formatted; fall back to 2024
           ;; (the edition `cargo new' picks) for files without a project.
-          (or (my-rust-cargo-edition) "2024"))))
+          (or (my-rust-cargo-edition) "2024")))
+  ;; Spell the mode mapping out too, so formatting does not depend on the
+  ;; installed Apheleia version already mapping both Rust modes.
+  (dolist (mode my-rust-modes)
+    (setf (alist-get mode apheleia-mode-alist) 'rustfmt)))
 
 ;;; Build: cargo
 
@@ -294,9 +418,24 @@ output in tests is shown."
   (my-rust-cargo-compile (my-rust-project-root) "clippy"))
 
 (defun my-rust-cargo-fmt ()
-  "Format the whole crate with `cargo fmt'."
+  "Format the whole crate with `cargo fmt'.
+This rewrites files on disk, so buffers visiting them go stale; for the
+file you are editing prefer `my-rust-format'."
   (interactive)
   (my-rust-cargo-compile (my-rust-project-root) "fmt"))
+
+(defun my-rust-format (&optional whole-crate)
+  "Format the current Rust buffer with apheleia (rustfmt).
+With prefix argument WHOLE-CRATE, run `cargo fmt' on the whole crate
+instead.  This is the Rust implementation behind the shared `,nf' key.
+Apheleia formats the buffer in place and keeps point, whereas `cargo fmt'
+rewrites the files on disk under the open buffers."
+  (interactive "P")
+  (cond
+   (whole-crate (my-rust-cargo-fmt))
+   ((fboundp 'apheleia-format-buffer)
+    (call-interactively #'apheleia-format-buffer))
+   (t (user-error "apheleia is not available; use a prefix argument for `cargo fmt'"))))
 
 (defun my-rust-cargo-update ()
   "Update dependencies with `cargo update'."
@@ -311,14 +450,18 @@ Rustdoc covers the crate, its dependencies, and the standard library."
 
 (defun my-rust-cargo-add (crate dev)
   "Add CRATE as a dependency with `cargo add'.
+CRATE may carry further `cargo add' arguments, for example
+\"serde --features derive\" or \"tokio@1 -F full\".
 With prefix argument DEV, add it under [dev-dependencies]."
   (interactive
-   (list (read-string "Crate to add: ") current-prefix-arg))
-  (when (string-empty-p crate)
+   (list (read-string "Crate to add (and options): ") current-prefix-arg))
+  (when (string-empty-p (string-trim crate))
     (user-error "Enter a crate name, for example serde"))
   (my-rust-cargo-compile
    (my-rust-project-root)
-   (concat "add " (shell-quote-argument crate) (when dev " --dev"))))
+   (concat "add "
+           (mapconcat #'shell-quote-argument (split-string-and-unquote crate) " ")
+           (when dev " --dev"))))
 
 (defun my-rust-cargo-clean ()
   "Remove build artifacts with `cargo clean'."
@@ -363,15 +506,16 @@ starts in target/debug/ when that directory exists."
       (user-error "Not an executable file: %s. Build the project first"
                   executable))
     (require 'gud)
+    ;; `gdb' and `lldb' split their command line with
+    ;; `split-string-and-unquote', which understands double quotes but not
+    ;; shell backslash escapes; `combine-and-quote-strings' is its inverse,
+    ;; so a path containing spaces survives the round trip.
     (pcase my-rust-debugger
       ((or 'rust-gdb 'gdb)
-       (gdb (format "%s -i=mi --args %s"
-                    (shell-quote-argument debugger)
-                    (shell-quote-argument executable))))
+       (gdb (combine-and-quote-strings
+             (list debugger "-i=mi" "--args" executable))))
       ((or 'rust-lldb 'lldb)
-       (lldb (format "%s %s"
-                     (shell-quote-argument debugger)
-                     (shell-quote-argument executable)))))))
+       (lldb (combine-and-quote-strings (list debugger executable)))))))
 
 ;;; Shared operations
 
@@ -381,7 +525,7 @@ starts in target/debug/ when that directory exists."
 (my-ide-register 'test my-rust-modes #'my-rust-cargo-test)
 (my-ide-register 'debug my-rust-modes #'my-rust-debug)
 (my-ide-register 'lint my-rust-modes #'my-rust-cargo-clippy)
-(my-ide-register 'format my-rust-modes #'my-rust-cargo-fmt)
+(my-ide-register 'format my-rust-modes #'my-rust-format)
 
 ;;; Keybindings
 
