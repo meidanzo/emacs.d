@@ -1,4 +1,6 @@
 ;;; init-CIDE.el --- personal C/C++ IDE setup  -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; The C/C++ IDE layer: build system commands (CMake/qmake/Autotools/
 ;; Make/Meson/Ninja/xmake/Bear), compile_commands.json management,

@@ -1,4 +1,6 @@
 ;;; init-ide.el --- language-neutral IDE operations  -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; The shared intersection (set C) of the language IDE layers: one key
 ;; does one thing in every supported language project.  Each language

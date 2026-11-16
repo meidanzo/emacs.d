@@ -1,4 +1,7 @@
 ;;; init-cc-mode.el --- C/C++/CMake editing setup -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com> and others
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; Editing-level setup for C/C++/CMake buffers:
 ;;   1. C/C++ (cc-mode)     Google style, 4-space indent, GDB window layout

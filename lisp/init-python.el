@@ -1,4 +1,7 @@
 ;;; init-python.el --- Python IDE: venv, LSP, pytest, pdb -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com> and others
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; Python layer:
 ;;   1. Project detection   non-git project markers for project.el

@@ -1,4 +1,6 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; @see http://endlessparentheses.com/super-smart-capitalization.html
 (defun endless/convert-punctuation (rg rp)

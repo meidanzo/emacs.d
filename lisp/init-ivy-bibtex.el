@@ -1,4 +1,6 @@
 ;;; init-ivy-bibtex.el --- Emacs文献子系统 -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com> and others
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 
 ;; my-ivy-bibtex-setup, my-ivy-insert-latex-citation 改编自 https://gitee.com/mickey991/emacs-config.git

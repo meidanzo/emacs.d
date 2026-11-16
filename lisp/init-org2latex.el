@@ -1,4 +1,6 @@
 ;;; package --- Summary init-org2latex.el --- ort-mode to LaTeX -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; org-mode中文文件可以转换成正确的LaTeX文件并通过编译 -> org-latex-classes
 ;; 如果嫌麻烦, 那么只需要在 org-mode 前面加上 `lisp/init-org2latex.el' 即可.

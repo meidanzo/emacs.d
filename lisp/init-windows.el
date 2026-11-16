@@ -1,4 +1,6 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; Navigate window layouts with "C-c <left>" and "C-c <right>"
 (my-run-with-idle-timer 2 #'winner-mode)

@@ -1,4 +1,6 @@
 ;;; init-tree-sitter.el --- tree-sitter grammars, auto-install, ts modes -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; Three jobs, in one place:
 ;;   1. Tell Emacs where grammar shared libraries live.

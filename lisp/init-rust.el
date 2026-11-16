@@ -1,4 +1,6 @@
 ;;; init-rust.el --- Rust IDE: cargo, rust-analyzer, rustfmt -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; The Rust layer, covering the eight pieces of a beginner-friendly Rust
 ;; IDE:

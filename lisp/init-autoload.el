@@ -1,4 +1,7 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com> and others
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 (autoload 'xclip-set-selection "xclip" "" t)
 (autoload 'xclip-get-selection "xclip" "" t)
 (autoload 'keyfreq-mode "keyfreq" "" t)

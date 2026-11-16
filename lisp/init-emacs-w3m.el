@@ -1,4 +1,6 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 (setq w3m-coding-system 'utf-8
       w3m-file-coding-system 'utf-8

@@ -1,4 +1,6 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; See `flymake-xml-program' for html flymake check
 ;; No extra setup is required.

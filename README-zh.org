@@ -807,9 +807,14 @@ set synctex-editor-command "emacsclient --no-wait +%{line} %{input}"
 
 如果是第三方软件包的问题，请将错误信息发送给原始开发者。
 
-如果 *你确定* 这是我的 bug，请在 [[https://github.com/redguardtoo/emacs.d]] 提交报告。不要给我发邮件！
+如果 *你确定* 这是我的 bug，请在 [[https://github.com/meidanzo/emacs.d]] 提交报告。不要给我发邮件！
 
 Bug 报告需要包含 *环境详情* 。
+* 来源与第三方代码
+本配置源自 [[https://github.com/purcell/emacs.d][purcell/emacs.d]]（BSD-2-Clause，Copyright (c) 2006-2021 Steve Purcell）与 [[https://github.com/redguardtoo/emacs.d][redguardtoo/emacs.d]]（GPL-3.0-or-later），经 meidanzo 多年修改演化而来。第三方许可证细节见 [[file:LICENSES/LICENSES.md][LICENSES/LICENSES.md]]。
+
+部分文件由 AI 辅助生成，经作者审查、修改与测试后采用。
+
 * 许可证
 此程序是自由软件：你可以根据自由软件基金会发布的 [[file:LICENSE][GNU 通用公共许可证]] 第 3 版或（由你选择）任何更新版本重新分发和/或修改它。
 

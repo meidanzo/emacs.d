@@ -1,4 +1,6 @@
 ;;; init-rime-ui.el --- Emacs-rime UI 配置 -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; Rime UI 配置
 ;; 需要 im-cursor-chg

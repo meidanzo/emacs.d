@@ -1,4 +1,6 @@
 ;;; init-LaTeX-mode.el --- Emacs LaTeX 环境搭建 -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com> and others
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;;; 配置插件: AUCTeX + RefTeX + CDLaTeX + amsreftex + auctex-cont-latexmk + auctex-label-numbers + evil-tex + ivy-bibtex
 ;;; + preview-auto

@@ -1,4 +1,6 @@
 ;;; init-preview.el --- org-mode 和 markdown 文件预览  -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;;; 配置插件: ox-gfm, grip-mode
 ;;; 依赖软件包: go-grip, firefox

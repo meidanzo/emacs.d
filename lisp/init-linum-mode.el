@@ -1,4 +1,6 @@
 ;;; init-linum-mode.el --- line number setup -*- lexical-binding: t; -*-
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Code:
 
 ;; http://stackoverflow.com/questions/3875213/turning-on-linum-mode-when-in-python-c-mode

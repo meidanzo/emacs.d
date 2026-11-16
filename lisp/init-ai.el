@@ -1,4 +1,6 @@
 ;;; init-ai.el --- AI setup  -*- lexical-binding: t -*-
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;;; Code:
 (defun my-gptel-mode-setup ()

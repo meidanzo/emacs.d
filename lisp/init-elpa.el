@@ -1,4 +1,7 @@
 ;; -*- coding: utf-8; lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com> and others
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 (defun my-initialize-package ()
   "Package loading optimization.  No need to activate all the packages so early."

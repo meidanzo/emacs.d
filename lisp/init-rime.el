@@ -1,4 +1,6 @@
 ;;; init-rime.el --- Emacs-rime 配置 -*- lexical-binding: t; -*-
+;; Copyright (C) 2026 meidanzo <meidanzo@foxmail.com>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;;; 依赖插件: evil, evil-escape, popup, posframe
 ;;; 依赖软件包: librime-dev

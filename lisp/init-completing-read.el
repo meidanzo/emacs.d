@@ -1,4 +1,6 @@
 ;;; -*- lexical-binding: t -*-
+;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 (use-package vertico
   :ensure t
