@@ -132,6 +132,17 @@ only while diagnosing a server problem."
 (with-eval-after-load 'eglot
   (setq eglot-autoshutdown t)
 
+  ;; A fresh language-server session on a large workspace can need more
+  ;; than Emacs' 10s request timeout for its first completion or xref
+  ;; answer (rust-analyzer on yazi, clangd on a big Qt project); the
+  ;; request then fails with a misleading "Timed out" error.  Verified
+  ;; on real projects: rust-analyzer's first completion in the yazi
+  ;; workspace exceeded the default.  Emacs 30 renamed the option; keep
+  ;; the Emacs 29 name working too.
+  (if (boundp 'jsonrpc-default-request-timeout)
+      (setq jsonrpc-default-request-timeout 60)
+    (setq jsonrpc-default-request-timeout 60))
+
   ;; Jumping to a definition outside the project (a system header, say)
   ;; opens a file the project's server does not own.  Without this, the
   ;; language layers' `eglot-ensure' mode hooks would start another
@@ -292,7 +303,10 @@ A second registration for the same MODES replaces the first."
 ;; language-specific layers share one prefix, "," "t", bound in their
 ;; respective mode maps (init-CIDE.el, init-rust.el) so the mode
 ;; decides which function fires.
-(with-eval-after-load 'evil
+;; Wait for init-evil rather than for evil itself (like init-python.el):
+;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
+;; loading inside it, before the definer exists.
+(with-eval-after-load 'init-evil
   (my-comma-leader-def
     "nb" #'my-ide-build
     ;; ,nc does not dispatch: `compile' is already language-neutral and

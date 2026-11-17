@@ -549,7 +549,10 @@ starts in target/debug/ when that directory exists."
 (ignore-errors (require 'rust-ts-mode))
 (ignore-errors (require 'rust-mode))
 
-(with-eval-after-load 'evil
+;; Wait for init-evil rather than for evil itself (like init-python.el):
+;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
+;; loading inside it, before the definer exists.
+(with-eval-after-load 'init-evil
   (my-comma-leader-def
     :keymaps my-rust-keymaps
     "tr" #'my-rust-cargo-run

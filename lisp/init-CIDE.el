@@ -847,18 +847,27 @@ SOURCE may be a build directory or a path to compile_commands.json."
 (defun my-cpp-capture-compilation-database (command)
   "Generate or capture compile_commands.json for the current project.
 Use native database export for CMake, Meson, and xmake. COMMAND is used with
-Bear for Autotools, Make, Ninja, qmake, and generic build commands."
+Bear for Autotools, Make, Ninja, qmake, and generic build commands.  A
+programmatic call without COMMAND on a Bear-only build system uses the
+default capture command instead of failing."
   (interactive
    (if (memq (my-cpp-current-build-system) '(cmake meson xmake))
        (list nil)
      (list (read-string "Build command to capture with Bear: "
                         (my-cpp-bear-command-default)))))
-  (if (null command)
+  (if (and (null command)
+           (memq (my-cpp-current-build-system) '(cmake meson xmake)))
       (pcase (my-cpp-current-build-system)
         ('cmake (my-cpp-cmake-configure))
         ('meson (my-cpp-meson-configure))
         ('xmake (my-cpp-xmake-configure)))
-    (let ((root (my-cpp-project-root)))
+    (let* ((root (my-cpp-project-root))
+           ;; nil COMMAND only reaches this branch from a programmatic
+           ;; call on a Bear-only build system (the interactive form
+           ;; always supplies one): fall back to the default capture
+           ;; command rather than failing with an opaque pcase
+           ;; mismatch.
+           (command (or command (my-cpp-bear-command-default))))
       (when (file-symlink-p (expand-file-name "compile_commands.json" root))
         (unless (yes-or-no-p
                  (format "Bear will replace the compile_commands.json symlink at %s.  Continue? "
@@ -1275,7 +1284,10 @@ argument, open the result in another window."
 (ignore-errors (require 'cmake-mode))
 (ignore-errors (require 'cmake-ts-mode))
 
-(with-eval-after-load 'evil
+;; Wait for init-evil rather than for evil itself (like init-python.el):
+;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
+;; loading inside it, before the definer exists.
+(with-eval-after-load 'init-evil
   (my-comma-leader-def
     :keymaps my-cpp-keymaps
     "tc" #'my-cpp-configure
