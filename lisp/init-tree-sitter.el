@@ -189,6 +189,14 @@ Buffers that are already open switch modes on their next `normal-mode'."
   (when (fboundp 'treesit-auto-add-to-auto-mode-alist)
     (ignore-errors (treesit-auto-add-to-auto-mode-alist))))
 
+(defvar my-treesit-grammars-ready-hook nil
+  "Hook run after a grammar installation has made grammars available.
+The language layers use it to load built-in tree-sitter mode files that
+they deliberately keep unloaded while the matching grammar is missing:
+files like `c-ts-mode.el' and `cmake-ts-mode.el' emit a warning when
+they load without their grammar.  Loading them only after the grammar
+exists keeps a fresh first session warning-free.")
+
 (defun my-treesit--install-finished (process languages)
   "Report the result of the background installation PROCESS of LANGUAGES."
   (when (memq (process-status process) '(exit signal))
@@ -200,7 +208,8 @@ Buffers that are already open switch modes on their next `normal-mode'."
         (message "tree-sitter grammars installed: %s"
                  (mapconcat #'symbol-name languages ", ")))
       (unless (equal missing languages)
-        (my-treesit--refresh-modes)))))
+        (my-treesit--refresh-modes)
+        (run-hooks 'my-treesit-grammars-ready-hook)))))
 
 (defun my-treesit--install-in-background (languages)
   "Install LANGUAGES in a background Emacs process."
@@ -245,7 +254,8 @@ See `my-treesit-install-asynchronously' for where the build runs."
         (my-treesit--install-in-background languages))
        (t
         (dolist (language languages)
-          (my-treesit-ensure-grammar language force))))))))
+          (my-treesit-ensure-grammar language force))
+        (run-hooks 'my-treesit-grammars-ready-hook)))))))
 
 (defun my-treesit-auto-install ()
   "Install missing grammars when `my-treesit-auto-install-grammars' is set."

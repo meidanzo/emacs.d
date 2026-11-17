@@ -1279,17 +1279,33 @@ argument, open the result in another window."
   "Mode maps where the C/C++-specific ',' 't' keys are active.")
 
 ;; The mode maps exist only after their libraries load (all built in).
-(ignore-errors (require 'c-ts-mode))
-(ignore-errors (require 'c++-ts-mode))
+;; c-ts-mode.el (which also provides c++-ts-mode) and cmake-ts-mode.el
+;; emit a non-quiet treesit-ready-p warning when they load while a
+;; grammar is missing, so they load only once their grammars exist; on
+;; a fresh install the background install (init-tree-sitter.el) runs the
+;; loader again from `my-treesit-grammars-ready-hook'.
 (ignore-errors (require 'cmake-mode))
-(ignore-errors (require 'cmake-ts-mode))
 
-;; Wait for init-evil rather than for evil itself (like init-python.el):
-;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
-;; loading inside it, before the definer exists.
-(with-eval-after-load 'init-evil
-  (my-comma-leader-def
-    :keymaps my-cpp-keymaps
+(defun my-cpp-load-ts-modes ()
+  "Load the built-in C/C++ and CMake tree-sitter modes when ready.
+Only loads a mode file when its grammars are installed, because the
+Emacs 30 core files warn when loaded without them."
+  (when (and (my-treesit-grammar-available-p 'c)
+             (my-treesit-grammar-available-p 'cpp))
+    (ignore-errors (require 'c-ts-mode)))
+  (when (my-treesit-grammar-available-p 'cmake)
+    (ignore-errors (require 'cmake-ts-mode))))
+
+(my-cpp-load-ts-modes)
+(add-hook 'my-treesit-grammars-ready-hook #'my-cpp-load-ts-modes)
+
+(defmacro my-cpp-bind-t-keys ()
+  "Bind the C/C++ `,' `t' keys in every mode map that exists yet.
+A tree-sitter mode map exists only after its file loads, which happens
+once the grammar is installed, so the keys are bound again from each
+mode file's `with-eval-after-load' hook."
+  '(my-comma-leader-def
+    :keymaps (seq-filter #'boundp my-cpp-keymaps)
     "tc" #'my-cpp-configure
     "tb" #'my-cpp-run-build-command
     "te" #'my-cpp-run-test-command
@@ -1298,6 +1314,13 @@ argument, open the result in another window."
     "tv" #'my-cpp-check-compilation-database
     "th" #'my-cpp-switch-source-header
     "tw" #'my-cpp-write-clang-format))
+
+;; Wait for init-evil rather than for evil itself (like init-python.el):
+;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
+;; loading inside it, before the definer exists.
+(with-eval-after-load 'init-evil (my-cpp-bind-t-keys))
+(with-eval-after-load 'c-ts-mode (my-cpp-bind-t-keys))
+(with-eval-after-load 'cmake-ts-mode (my-cpp-bind-t-keys))
 
 (my-cpp-configure-existing-buffers)
 

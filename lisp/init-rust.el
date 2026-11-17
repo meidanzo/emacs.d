@@ -545,16 +545,28 @@ starts in target/debug/ when that directory exists."
 (defconst my-rust-keymaps '(rust-ts-mode-map rust-mode-map)
   "Mode maps where the cargo-specific ',' 't' keys are active.")
 
-;; The mode maps exist only after their libraries load.
-(ignore-errors (require 'rust-ts-mode))
+;; The mode maps exist only after their libraries load.  rust-ts-mode
+;; (built into Emacs) warns when it loads while the grammar is missing,
+;; so it loads only once the grammar exists; on a fresh install the
+;; background install (init-tree-sitter.el) runs the loader again from
+;; `my-treesit-grammars-ready-hook'.
 (ignore-errors (require 'rust-mode))
 
-;; Wait for init-evil rather than for evil itself (like init-python.el):
-;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
-;; loading inside it, before the definer exists.
-(with-eval-after-load 'init-evil
-  (my-comma-leader-def
-    :keymaps my-rust-keymaps
+(defun my-rust-load-ts-mode ()
+  "Load the built-in `rust-ts-mode' once the grammar is installed."
+  (when (my-treesit-grammar-available-p 'rust)
+    (ignore-errors (require 'rust-ts-mode))))
+
+(my-rust-load-ts-mode)
+(add-hook 'my-treesit-grammars-ready-hook #'my-rust-load-ts-mode)
+
+(defmacro my-rust-bind-t-keys ()
+  "Bind the cargo `,' `t' keys in every Rust mode map that exists yet.
+The tree-sitter mode map exists only after its file loads, which happens
+once the grammar is installed, so the keys are bound again from its
+`with-eval-after-load' hook."
+  '(my-comma-leader-def
+    :keymaps (seq-filter #'boundp my-rust-keymaps)
     "tr" #'my-rust-cargo-run
     "tc" #'my-rust-cargo-check
     "tu" #'my-rust-cargo-update
@@ -562,6 +574,12 @@ starts in target/debug/ when that directory exists."
     "td" #'my-rust-cargo-doc
     "tx" #'my-rust-cargo-clean
     "tb" #'my-rust-cargo-command))
+
+;; Wait for init-evil rather than for evil itself (like init-python.el):
+;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
+;; loading inside it, before the definer exists.
+(with-eval-after-load 'init-evil (my-rust-bind-t-keys))
+(with-eval-after-load 'rust-ts-mode (my-rust-bind-t-keys))
 
 ;;; Existing buffers
 
