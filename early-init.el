@@ -29,6 +29,13 @@
 
 ;;; Code:
 
+;; Debian latex-cjk-common 4.8.5-1 的 site-start 文件
+;; (/etc/emacs/site-start.d/50latex-cjk-{common,thai}.el) 引用了 emacsen-common 3.x
+;; 已移除的遗留变量 `flavor', 启动时报 "Symbol's value as variable is void: flavor",
+;; 且 cjk-enc 未被加载 (CJK LaTeX 编码支持缺失)。
+;; early-init.el 先于 site-start 加载, 在此补上定义。
+(defvar flavor 'emacs)
+
 (when (or (featurep 'esup-child)
           (fboundp 'profile-dotemacs)
           (daemonp)

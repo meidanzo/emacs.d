@@ -228,6 +228,19 @@ If NO-REFRESH is nil, `package-refresh-contents' is called."
       (package-refresh-contents))
     (package-install package)))
 
+;; MELPA 预编译的 marginalia.elc 是在 compat-31 shim 未定义的环境下编译的,
+;; 其中 (compat-call seconds-to-string time 'expanded 'abbrev) 被展开为直接
+;; 调用原生 seconds-to-string (Emacs 31 才有的 3 参数签名), 在 Emacs 30 上报
+;; "wrong-number-of-arguments" (见 marginalia--time-relative, marginalia 2.13)。
+;; 删除 .elc 让 Emacs 加载 .el 源码: compat-call 在加载时按当前 Emacs 版本
+;; 重新展开, 同时兼容 Emacs 30 和 31。
+(defun my-marginalia-drop-elc (&rest _)
+  (let ((elc (car (file-expand-wildcards
+                   (expand-file-name "marginalia-*/marginalia.elc"
+                                     package-user-dir)))))
+    (when elc (delete-file elc))))
+(advice-add 'package-install :after #'my-marginalia-drop-elc)
+
 ;;------------------------------------------------------------------------------
 ;; Fire up package.el and ensure the following packages are installed.
 ;;------------------------------------------------------------------------------
