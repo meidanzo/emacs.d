@@ -2,6 +2,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 (defun my-emms-track-description (track)
   "Description of TRACK."
   (let ((desc (emms-track-simple-description track))
@@ -31,8 +33,7 @@
 
      (exiftool-p
       (require 'emms-info-exiftool)
-      (setq emms-info-functions '(emms-info-exiftool))
-      (setq emms-info-functions '(emms-print-metadata))))
+      (setq emms-info-functions '(emms-info-exiftool))))
 
     (when (or emms-cli-p exiftool-p)
       (setq emms-track-initialize-functions '(emms-info-initialize-track))))
@@ -67,8 +68,6 @@ If SUBDIR-P is t, play videos in sub-directories too."
         (emms-playlist-mode)
         (setq default-directory dir)
         (emms-playlist-current-clear)))
-
-    (sit-for 1)
 
     (cond
      ;; at least two items are selected
@@ -217,7 +216,7 @@ If INPUT-P is t, `my-emms-playlist-random-track-keyword' is input by user."
   (my-ensure 'emms-player-simple)
 
   (emms-stop)
-  (when (bufferp emms-playlist-buffer-name)
+  (when (get-buffer emms-playlist-buffer-name)
     (kill-buffer emms-playlist-buffer-name))
 
   (let ((m3u-files (my-lisp-find-file-or-directory my-music-root-directory ".*\\.m3u"))

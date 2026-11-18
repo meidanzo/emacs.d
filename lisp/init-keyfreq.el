@@ -3,6 +3,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 (local-require 'keyfreq)
 
 (defun turnon-keyfreq-mode ()
@@ -96,9 +98,9 @@
           "^select-window-"
           "^undo-"
           "^web-mode"
-          "^w3m-"
           "^yas-"
           "^y-or-n-"
+          "^vertico-"
           "emms-"))
 
   (my-write-to-missing-file "()" keyfreq-file))
@@ -110,3 +112,5 @@
 ;; (turnon-keyfreq-mode)
 
 (provide 'init-keyfreq)
+(provide 'init-keyfreq)
+;;; init-keyfreq.el ends here

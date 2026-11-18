@@ -2,13 +2,17 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
-(defun copy-yank-str (msg &optional clipboard-only)
+;;; Code:
+
+(defun my-copy-yank-str (msg &optional clipboard-only)
+  "Copy and yank MSG with CLIPBOARD-ONLY."
   (unless clipboard-only (kill-new msg))
   (my-pclip msg)
   msg)
 
 (defvar my-short-introduction-of-file
   "Full source of \"%s\" is as below,\n\n%s\n\n")
+
 (defun cp-filename-and-content-of-current-buffer (&optional n)
   "Copy file name and its content into yank ring and clipboard.
 If N is not nil, copy file path and its content instead."
@@ -16,7 +20,7 @@ If N is not nil, copy file path and its content instead."
   (when buffer-file-name
     (let* ((filename (if n buffer-file-name
                        (file-name-nondirectory buffer-file-name))) )
-      (copy-yank-str (format my-short-introduction-of-file
+      (my-copy-yank-str (format my-short-introduction-of-file
                              filename
                              (buffer-string)))
       (message "%s and its content => clipboard&kill-ring" filename))))
@@ -28,18 +32,18 @@ If N is not nil, copy file name and line number."
   (when buffer-file-name
     (let* ((filename (file-name-nondirectory buffer-file-name))
            (s (if n (format "%s:%s" filename (line-number-at-pos)) filename)))
-      (copy-yank-str s)
+      (my-copy-yank-str s)
       (message "%s => clipboard&kill-ring" s))))
 
 (defun cp-fullpath-of-current-buffer ()
   "Copy full path into the yank ring and OS clipboard."
   (interactive)
   (when buffer-file-name
-    (copy-yank-str (file-truename buffer-file-name))
+    (my-copy-yank-str (file-truename buffer-file-name))
     (message "file full path => clipboard & yank ring")))
 
 (defun cp-root-relative-path-of-current-buffer ()
-  "Copy path relative to the project root into the yank ring and OS clipboard"
+  "Copy path relative to the project root into yank ring and clipboard."
   (interactive)
   (when buffer-file-name
     ;; require ffip to get project root
@@ -52,12 +56,9 @@ If N is not nil, copy file name and line number."
        ((not root)
         (message "Can't find project root."))
 
-       ((not file-path)
-        (message "File path of current buffer is empty."))
-
        (t
         (setq relative-path (file-relative-name file-path root))
-        (copy-yank-str relative-path)
+        (my-copy-yank-str relative-path)
         (message "%s => clipboard & yank ring" relative-path))))))
 
 (defun my-kill-ring-to-clipboard ()
@@ -66,7 +67,7 @@ If N is not nil, copy file name and line number."
   (my-select-from-kill-ring (lambda (s)
                               (let* ((summary (car s))
                                      (hint " => clipboard" )
-                                     (msg (if (string-match "\.\.\.$" summary)
+                                     (msg (if (string-match "\\.\\.\\.$" summary)
                                               (substring summary 0 (- (length summary) (length hint)))
                                             s)))
                                 ;; cc actual string
@@ -74,39 +75,17 @@ If N is not nil, copy file name and line number."
                                 ;; echo
                                 (message "%s%s" msg hint)))))
 
-(defun copy-to-x-clipboard (&optional num)
-  "If NUM equals 1, copy the down-cased string.
-If NUM equals 2, copy the capitalized string.
-If NUM equals 3, copy the up-cased string.
-If NUM equals 4, indent 4 spaces."
-  (interactive "P")
+(defun copy-to-x-clipboard ()
+  "Copy text to clipboard."
+  (interactive)
   (let* ((thing (my-use-selected-string-or-ask "")))
     (if (region-active-p) (deactivate-mark))
-    (cond
-     ((not num))
-     ((= num 1)
-      (setq thing (downcase thing)))
-     ((= num 2)
-      (setq thing (capitalize thing)))
-     ((= num 3)
-      (setq thing (upcase thing)))
-     ((= num 4)
-      (setq thing (string-trim-right (concat "    "
-                                             (mapconcat 'identity (split-string thing "\n") "\n    ")))))
-     (t
-      (message "C-h f copy-to-x-clipboard to find right usage")))
-
     (my-pclip thing)
-    (if (not (and num (= 4 num))) (message "kill-ring => clipboard")
-      (message "thing => clipboard!"))))
+    (message "thing => clipboard!")))
 
-(defun paste-from-x-clipboard(&optional n)
-  "Remove selected text and paste string clipboard.
-If N is 1, we paste diff hunk whose leading char should be removed.
-If N is 2, paste into `kill-ring' too.
-If N is 3, converted dashed to camel-cased then paste.
-If N is 4, rectangle paste."
-  (interactive "P")
+(defun paste-from-x-clipboard()
+  "Remove selected text and paste string clipboard."
+  (interactive)
   (when (and (functionp 'evil-normal-state-p)
              (functionp 'evil-move-cursor-back)
              (evil-normal-state-p)
@@ -123,19 +102,7 @@ If N is 4, rectangle paste."
       (font-lock-mode -1))
 
     (my-delete-selected-region)
-
-    ;; paste after the cursor in evil normal state
-    (cond
-     ((not n)) ; do nothing
-     ((= 1 n)
-      (setq str (replace-regexp-in-string "^\\(+\\|-\\|@@ $\\)" "" str)))
-     ((= 2 n)
-      (kill-new str))
-     ((= 3 n)
-      (setq str (mapconcat (lambda (s) (capitalize s)) (split-string str "-") "")))
-     ((= 4 n)
-      (setq fn 'insert-rectangle)
-      (setq str (split-string str "[\r]?\n"))))
     (funcall fn str)))
 
 (provide 'init-clipboard)
+;;; init-clipboard.el ends here

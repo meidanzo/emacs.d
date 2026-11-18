@@ -294,7 +294,7 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
   (let* ((msg (which-function)))
     (when msg
       (popup-tip msg)
-      (copy-yank-str msg))))
+      (my-copy-yank-str msg))))
 ;; }}
 
 ;; {{ music
@@ -303,7 +303,7 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
   (interactive)
   (let* ((msg (car (my-nonempty-lines (shell-command-to-string "mpc")))))
     (message msg)
-    (copy-yank-str msg)))
+    (my-copy-yank-str msg)))
 
 (defun mpc-next-prev-song (&optional previous)
   "Select PREVIOUS song if it's not nil; or else select next song."
@@ -349,7 +349,7 @@ So it's at the top of clipboard manager."
     (setq str (replace-regexp-in-string ":.*$\\|\"" "" str))
     ;; join lines
     (setq str (replace-regexp-in-string "[\r\n \t]+" " " str))
-    (copy-yank-str str)
+    (my-copy-yank-str str)
     (message "%s => clipboard & yank ring" str)))
 
 (defun my-insert-absolute-path()
@@ -357,7 +357,7 @@ So it's at the top of clipboard manager."
   (interactive)
   (let* ((str (my-use-selected-string-or-ask "Input relative path:"))
          (path (file-truename str)))
-    (copy-yank-str path)
+    (my-copy-yank-str path)
     (message "%s => clipboard & yank ring" path)))
 
 (defun my-insert-relative-path()
@@ -365,7 +365,7 @@ So it's at the top of clipboard manager."
   (interactive)
   (let* ((str (my-use-selected-string-or-ask "Input absolute path:"))
          (path (file-relative-name str)))
-    (copy-yank-str path)
+    (my-copy-yank-str path)
     (message "%s => clipboard & yank ring" path)))
 
 ;; indention management
@@ -388,7 +388,7 @@ So it's at the top of clipboard manager."
         (setq n (length kill-ring)))
     (let* ((rlt (mapconcat 'identity (cl-subseq kill-ring 0 n) "|")))
       (setq rlt (replace-regexp-in-string "(" "\\\\(" rlt))
-      (copy-yank-str rlt)
+      (my-copy-yank-str rlt)
       (message (format "%s => kill-ring&clipboard" rlt)))))
 ;; }}
 
@@ -807,7 +807,7 @@ might be bad."
 		   (forward-char -1)
 		   (my-dict-complete-definition)))
   (local-set-key (kbd ";") 'my-hydra-ebook/body)
-  (local-set-key (kbd "w") 'mybigword-big-words-in-current-window))
+  (local-set-key (kbd "w") #'mybigword-big-words-in-current-window))
 (add-hook 'nov-mode-hook 'nov-mode-hook-setup)
 
 (with-eval-after-load 'nov

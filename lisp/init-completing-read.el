@@ -2,6 +2,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 (use-package vertico
   :ensure t
   :init
@@ -27,7 +29,7 @@
 
 (use-package savehist
   :init
-  (savehist-mode))
+  (savehist-mode 1))
 
 (use-package orderless
   :ensure t
@@ -63,7 +65,8 @@
   :config
   (require 'embark-consult)
   ;; press C-c C-p to edit in wgrep buffer
-  (setf (alist-get 'fastctags-grep embark-exporters-alist) 'embark-consult-export-grep))
+  (setf (alist-get 'fastctags-grep embark-exporters-alist)
+        #'embark-consult-export-grep))
 
 (setq completions-format 'one-column)
 (setq completion-auto-help 'visible)

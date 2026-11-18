@@ -2,6 +2,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 (setq-default js2-use-font-lock-faces t
               js2-mode-must-byte-compile nil
               ;; {{ comment indention in modern frontend development
@@ -56,7 +58,7 @@ If NOT-JSON-P is not nil, validate as Javascript expression instead of JSON."
 (defun my-print-json-path (&optional hardcoded-array-index)
   "Print the path to the JSON value under point, and save it in the kill ring.
 If HARDCODED-ARRAY-INDEX provided, array index in JSON path is replaced with it."
-  (interactive "P")
+  (interactive "p")
   (cond
    ((memq major-mode '(js2-mode))
     (js2-print-json-path hardcoded-array-index))
@@ -132,6 +134,7 @@ INDENT-SIZE decide the indentation level.
 
 ;; {{ js-comint
 (defun my-js-clear-send-buffer ()
+  "Send current buffer to javascript shell."
   (interactive)
   (js-comint-clear)
   (js-comint-send-buffer))
@@ -203,3 +206,4 @@ INDENT-SIZE decide the indentation level.
                 "utag"))
 
 (provide 'init-javascript)
+;;; init-javascript.el ends here
