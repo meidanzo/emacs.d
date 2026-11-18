@@ -132,6 +132,31 @@ installed and the default resolves to the wrong one."
   :type 'string
   :group 'my-cpp)
 
+(defcustom my-cpp-parallel-jobs nil
+  "Maximum concurrent jobs for parallel build commands, or nil.
+nil means the processor count (`nproc').  The count is always passed
+explicitly: `--parallel N' for the CMake backend, `-j N' for the Make,
+qmake, and Autotools backends.  An omitted count is unsafe either way:
+`cmake --build --parallel' without one hands GNU Make a bare `-j', which
+runs an UNLIMITED number of concurrent compilations; a bare `make' stays
+serial.  Unlimited `-j' on a project the size of albert launches dozens
+of g++ processes at once and exhausts RAM (observed: a full freeze of
+this machine).  Set an explicit number here, or per-project in
+.dir-locals.el, to bound the memory used."
+  :type '(choice (const :tag "Processor count" nil)
+                 (integer :tag "Explicit job count"))
+  :group 'my-cpp)
+
+(defun my-cpp-effective-parallel-jobs ()
+  "Return the job count for parallel builds.
+The explicit `my-cpp-parallel-jobs' wins; otherwise ask `nproc' and never
+fall below 1."
+  (or my-cpp-parallel-jobs
+      (max 1 (string-to-number
+              (or (with-demoted-errors "nproc failed: %S"
+                    (shell-command-to-string "nproc"))
+                  "")))))
+
 (defcustom my-cpp-cmake-configure-options nil
   "Extra CMake configure arguments, such as a toolchain file or generator.
 Each list element is passed as one shell-quoted argument."
@@ -183,6 +208,7 @@ This is passed to the selected GDB or LLDB command."
        (memq value '(auto cmake qmake autotools make meson ninja xmake generic))))
 (put 'my-cpp-debugger 'safe-local-variable
      (lambda (value) (memq value '(gdb lldb))))
+(put 'my-cpp-parallel-jobs 'safe-local-variable #'integerp)
 
 ;;; Project detection
 
@@ -459,9 +485,13 @@ The result is always an expanded path (see `my-cpp-project-root')."
   (let ((build-directory (my-cpp-cmake-build-directory)))
     (my-cpp-compile-at
      build-directory
-     (format "cmake --build %s --config %s --parallel"
+     ;; An explicit job count is mandatory: `cmake --build --parallel'
+     ;; without a count hands `-j' (unlimited) to GNU Make, which can
+     ;; launch one g++ per ready target and exhaust RAM on large projects.
+     (format "cmake --build %s --config %s --parallel %s"
              (shell-quote-argument build-directory)
-             (shell-quote-argument my-cpp-cmake-build-config)))))
+             (shell-quote-argument my-cpp-cmake-build-config)
+             (my-cpp-effective-parallel-jobs)))))
 
 (defun my-cpp-cmake-test ()
   "Run CTest in the selected CMake build directory."
@@ -643,9 +673,11 @@ run), or else with `autoreconf -fi'."
 (defun my-cpp-autotools-build ()
   "Build an Autotools project in its configured out-of-source directory."
   (interactive)
+  ;; Explicit `-j N' like the Make backend: a bare `-j' is unlimited.
   (my-cpp-compile-at
    (my-cpp-project-root)
-   (format "%s -C %s" my-cpp-make-command
+   (format "%s -j %s -C %s" my-cpp-make-command
+           (my-cpp-effective-parallel-jobs)
            (shell-quote-argument (my-cpp-autotools-build-directory)))))
 
 (defun my-cpp-autotools-test ()
@@ -661,7 +693,13 @@ run), or else with `autoreconf -fi'."
 (defun my-cpp-make-build ()
   "Build the project with its Makefile."
   (interactive)
-  (my-cpp-compile-at (my-cpp-project-root) my-cpp-make-command))
+  ;; An explicit job count, like the CMake backend: a bare `make -j' is
+  ;; unlimited and can exhaust RAM the way `cmake --build --parallel' did.
+  ;; The explicit flag also overrides any MAKEFLAGS=-j from the environment.
+  (my-cpp-compile-at
+   (my-cpp-project-root)
+   (format "%s -j %s" my-cpp-make-command
+           (my-cpp-effective-parallel-jobs))))
 
 (defun my-cpp-ninja-build-directory (&optional choose)
   "Find a Ninja build directory, prompting if it is ambiguous or absent.
@@ -827,12 +865,21 @@ SOURCE may be a build directory or a path to compile_commands.json."
       (message "clangd will read %s" link)))))
 
 (defun my-cpp-bear-command-default ()
-  "Return a useful Bear command for the detected build system."
+  "Return a useful Bear command for the detected build system.
+The Make-based branches pass the same explicit `-j N' as the build
+commands, so a full `-B' recapture of a large project takes minutes
+instead of an hour.  Bear 3.x serializes the captured records itself,
+so parallel capture is safe (verified with bear 3.1.6: 40/40 entries
+intact at -j 12).  The Ninja and Meson branches keep their tools' own
+bounded defaults."
   (let ((root (my-cpp-project-root)))
     (pcase (my-cpp-current-build-system)
-      ((or 'make 'qmake) (concat "bear -- " my-cpp-make-command " -B"))
+      ((or 'make 'qmake)
+       (format "bear -- %s -j %s -B" my-cpp-make-command
+               (my-cpp-effective-parallel-jobs)))
       ('autotools
-       (format "bear -- %s -B -C %s" my-cpp-make-command
+       (format "bear -- %s -j %s -B -C %s" my-cpp-make-command
+               (my-cpp-effective-parallel-jobs)
                (shell-quote-argument (my-cpp-autotools-build-directory))))
       ('ninja
        (let ((build-directory (my-cpp-ninja-build-directory)))
@@ -842,7 +889,8 @@ SOURCE may be a build directory or a path to compile_commands.json."
       ('meson (format "bear -- meson compile -C %s"
                       (shell-quote-argument
                        (my-cpp-meson-build-directory))))
-      (_ (concat "bear -- " my-cpp-make-command " -B")))))
+      (_ (format "bear -- %s -j %s -B" my-cpp-make-command
+                 (my-cpp-effective-parallel-jobs))))))
 
 (defun my-cpp-capture-compilation-database (command)
   "Generate or capture compile_commands.json for the current project.

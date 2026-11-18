@@ -135,6 +135,30 @@ it is read once, when `project' loads."
   :type 'boolean
   :group 'tools)
 
+(defcustom my-rust-cargo-jobs 4
+  "Maximum jobs for cargo processes started from Emacs, or nil.
+The value is exported as the CARGO_BUILD_JOBS environment variable, which
+cargo honors for every build (build, check, clippy, test, install) and
+which rust-analyzer's check-on-save and shells started from Emacs
+inherit.  With 4, a cold release build of a workspace the size of yazi
+peaked at ~3.4 GiB on this machine (measured); cargo's default (one job
+per CPU core) can stack several multi-GiB rustc processes at once.  The
+cap limits build jobs only: `cargo test' still runs test binaries with
+cargo's usual per-core parallelism.  An explicit `cargo build -j N'
+overrides it for that one command.
+
+nil keeps cargo's default.  The variable is exported when this file
+loads; after changing it, re-evaluate it (or restart), and reconnect
+Eglot so a running rust-analyzer inherits the new value.  Cargo run
+outside Emacs (for example from a terminal) does not see this setting;
+for a machine-wide cap use `[build] jobs' in ~/.cargo/config.toml."
+  :type '(choice (const :tag "cargo default (one job per CPU core)" nil)
+                 (integer :tag "Explicit job count"))
+  :group 'tools)
+
+(when my-rust-cargo-jobs
+  (setenv "CARGO_BUILD_JOBS" (number-to-string my-rust-cargo-jobs)))
+
 ;;; Style / indentation
 
 ;; rust-ts-mode and rust-mode both default to four-space indentation;
