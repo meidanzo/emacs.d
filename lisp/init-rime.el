@@ -88,11 +88,9 @@
      (current-input-method
       ;; evil-escape and rime may conflict
       ;; @see https://github.com/redguardtoo/emacs.d/issues/629
-      (evil-escape-mode -1)
-      (message "Rime IME on!  🚀"))
+      (evil-escape-mode -1))
      (t
-      (evil-escape-mode 1)
-      (message "Rime IME off! 🌙"))))
+      (evil-escape-mode 1))))
    (t
     ;; NOT evil-mode
     (toggle-input-method))))
@@ -104,8 +102,7 @@
   (when (and current-input-method
              ;; (eq evil-state 'insert)
              (evil-insert-state-p)
-             )
-    (message "Rime IME on! 🚀")))
+             )))
 
 (with-eval-after-load 'evil
   "通知用户输入法状态"
