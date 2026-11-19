@@ -1,0 +1,342 @@
+#+TITLE: Python, C/C++, Rust IDE 配置说明
+#+DATE: 2026-11-18
+#+OPTIONS: toc:3 num:t
+
+本文档结合当前 ~/.emacs.d 配置代码与 Development 目录的历史文档整合
+而成, 对 Python, C/C++, Rust 三个 IDE 层的设置, 用法和工作流程做出
+说明. 历史文档中的过时内容已甄别剔除; 本文档只描述当前配置的真实行为
+(全部经过本机实测: Emacs 30.1, clangd 19, rust-analyzer 1.99,
+basedpyright, neocmakelsp).
+
+* 1. 总览
+
+** 1.1 三层架构
+
+这套配置把每种语言分成三层:
+
+- 编辑层: evil, company, yasnippet, ws-butler, tree-sitter 模式,
+  fastctags 兜底.
+- 语言层: Eglot + 各语言服务器, Flymake 诊断, xref 跳转, inlay
+  hints, apheleia 保存时格式化.
+- 工程层: 构建/测试/调试命令, 编译数据库管理 (C/C++), venv 管理
+  (Python), cargo 命令族 (Rust).
+
+** 1.2 关键文件
+
+| 文件                       | 职责                                                        |
+|----------------------------+-------------------------------------------------------------|
+| lisp/init-ide.el           | 语言无关的共享层: 操作注册表, 共享 ,n 键, Eglot 通用设置, Flycheck 排除, Apheleia 自动保存保护 |
+| lisp/init-python.el        | Python 层: venv, Eglot, ruff, pytest, pdb, 项目命令           |
+| lisp/init-CIDE.el          | C/C++ 层: 八种构建系统后端, 编译数据库, clangd, cppcheck, GDB/LLDB |
+| lisp/init-cc-mode.el       | C/C++ 编辑层: 4 空格缩进, 头文件搜索, imenu                    |
+| lisp/init-rust.el          | Rust 层: cargo 命令族, rust-analyzer, rustfmt, rust-gdb/lldb  |
+| lisp/init-tree-sitter.el   | tree-sitter 语法库安装与 ts 模式切换                           |
+| lisp/init-company.el       | company 全局设置 (补全 UI)                                    |
+| lisp/init-evil.el          | evil 层: 逗号 leader 框架, 文本对象, 全局编辑键                |
+
+** 1.3 核心链路 (三种语言相同)
+
+打开文件 -> 进入 tree-sitter 模式 -> Eglot 自动启动语言服务器 ->
+company 补全 (服务器优先, dabbrev/files 兜底) -> Flymake 显示诊断 ->
+保存时 apheleia 自动格式化 (空闲自动保存不触发) -> 构建/测试/调试用
+共享 ,n 键按语言分发.
+
+* 2. 共享基础设施 (init-ide.el)
+
+** 2.1 共享操作与 ,n 键位
+
+每种语言层把它的实现注册到共享操作表, 同一个键在每种语言里做同一件
+事, 由当前 buffer 的主模式决定派发:
+
+| 键位 | 命令         | C/C++                  | Rust                | Python             |
+|------+--------------+------------------------+---------------------+--------------------|
+| ,nb  | build        | my-cpp-build           | my-rust-cargo-build | my-python-check    |
+| ,nc  | compile      | compile (通用)         | compile (通用)      | compile (通用)     |
+| ,nt  | test         | my-cpp-test            | my-rust-cargo-test  | my-python-test     |
+| ,nd  | debug        | my-cpp-debug           | my-rust-debug       | my-python-debug    |
+| ,nl  | lint         | my-cpp-cppcheck        | my-rust-cargo-clippy| my-python-lint     |
+| ,nf  | format       | my-cpp-format-buffer   | my-rust-format      | my-python-format   |
+| ,nr  | rename       | eglot-rename           | 同左                | 同左               |
+| ,na  | code actions | eglot-code-actions     | 同左                | 同左               |
+| ,ni  | references   | xref-find-references   | 同左                | 同左               |
+| ,ne  | reconnect    | eglot-reconnect        | 同左                | 同左               |
+
+说明: ,nc 不做派发, 直接调用通用 compile (上游曾用 my-compile, 已在
+同步中删除); ,nb 在 Python 里是语法检查 (compileall), 因为 Python
+没有编译步骤.
+
+** 2.2 Eglot 通用设置
+
+- eglot-autoshutdown t: 最后一个托管 buffer 关闭后结束服务器.
+- eglot-extend-to-xref t: 跳到项目外文件 (如系统头文件) 时复用原
+  项目的服务器, 而不是按目录起新服务器.
+- JSON-RPC 请求超时从 Emacs 默认的 10 秒提升到 60 秒
+  (jsonrpc-default-request-timeout, Emacs 29 用
+  jsonrpc-request-timeout): 大工作区上新建的服务器首次补全或跳转
+  可能超过 10 秒 (实测 yazi 工作区的 rust-analyzer), 默认值下会误报
+  "Timed out".
+- 事件日志默认关闭 (eglot-events-buffer-config :size 0), 调试时可把
+  my-ide-eglot-log-events 设为 t 打开.
+- 服务器的 capf 函数置顶 (remove-then-add, 保证 -100 深度真正生效),
+  关闭托管时不会留下死 capf.
+- 诊断只用 Flymake; Flycheck 通过 my-ide-flycheck-exclude 从三种
+  语言的模式中排除 (各层共用, 与加载顺序无关).
+- eglot-managed-mode-hook 自动打开 eglot-inlay-hints-mode (服务器不
+  支持时自动关闭).
+- Emacs 30 兼容修复: xref-backend-identifier-at-point 对 Eglot 返回
+  字面 docstring 导致跳转失败, 已覆盖为返回光标处符号.
+- company-backends 被 Emacs 30 的 Eglot 收窄为 company-capf 后, 由
+  各语言层注册的列表自动恢复 (my-ide-restore-company-backends).
+
+** 2.3 Apheleia 与自动保存
+
+auto-save-visited-mode (0.5 秒间隔) 也触发 after-save-hook. 通用
+advice my-apheleia-skip-auto-save 只在空闲定时器触发的保存时跳过
+格式化; C-x C-s 等手动保存照常格式化. 该 advice 语言中立, 放在
+init-ide.el, 不依赖某个语言层被加载.
+
+* 3. Python 层 (init-python.el)
+
+** 3.1 设置
+
+- 主模式: python-ts-mode (语法库可用时自动从 python-mode 重映射).
+- 缩进: 4 空格, 无 Tab, 关闭冒号电缩进.
+- 项目检测: pyproject.toml, setup.py, setup.cfg, requirements.txt,
+  Pipfile 作为非 git 项目的 project.el 标记 (有版本控制时以 VC 根
+  为准, 避免嵌套标记劫持项目根).
+- venv: 打开 .py 文件时自动激活项目根 .venv (只激活已存在的); 创建
+  优先用 uv, 回退 python3 -m venv; 激活后 exec-path 与 PATH 同步.
+- LSP: eglot-server-programs 按序选择 basedpyright / pyrefly /
+  pyright / pylsp, 打开文件自动启动.
+- 补全: company-capf 优先, company-dabbrev-code / company-files 兜底.
+- 格式化: apheleia + ruff, 保存时触发.
+- ~/.local/bin 自动加入 exec-path 与 PATH (用户安装的 ruff 和
+  basedpyright 通常在 ~/.local/bin).
+
+** 3.2 语言专属键位 (,t 前缀)
+
+| 键位 | 命令               | 用途                                   |
+|------+--------------------+----------------------------------------|
+| ,tr  | my-python-run      | 运行当前脚本 (comint 编译 buffer, 可交互) |
+| ,tc  | my-python-check    | compileall 全项目语法检查 (排除 .venv/venv/.tox 等; pycache 写入临时目录不留痕) |
+| ,tu  | my-python-update-deps | uv sync 或 pip install -r/-e        |
+| ,ta  | my-python-add-dep  | uv add 或 pip install 加依赖          |
+| ,td  | my-python-pydoc    | python -m pydoc 查文档                |
+| ,tx  | my-python-clean    | 删除项目 __pycache__                  |
+| ,tb  | my-python-command  | 任意项目命令 (项目根执行)              |
+
+** 3.3 用法与工作流程
+
+1. 一次性: uv venv .venv (或 M-x my-python-create-venv); 依赖用
+   ,tu 安装.
+2. 日常: 打开 .py -> 自动激活 venv + 启动 basedpyright -> company
+   补全 -> 保存时 ruff 格式化 -> Flymake 看诊断 -> ,tr 运行脚本 ->
+   ,nt 跑 pytest (可带前缀参数传参) -> ,nl 跑 ruff check -> ,nd
+   进入 pdb (GUD) 调试 -> ,tb 跑任意项目命令.
+3. 无 .venv 时一切照常, 只少 venv 激活; 无语言服务器时补全回退
+   dabbrev.
+
+** 3.4 需要的系统程序
+
+uv (可选, 建 venv 更快), basedpyright 或 pyrefly 或 pyright 或 pylsp
+(任一), ruff, pytest. pdb/compileall/pydoc 随 Python 自带.
+
+* 4. C/C++ 层 (init-CIDE.el + init-cc-mode.el)
+
+** 4.1 设置
+
+- 主模式: c-ts-mode / c++-ts-mode (语法库可用时), 回退 c-mode /
+  c++-mode; CMake 文件用 cmake-ts-mode.
+- 缩进: 编辑层 4 空格 (google-c-style + c-basic-offset 4; ts 模式用
+  c-ts-mode-indent-offset 4), 与格式化回退风格一致.
+- 项目检测: 项目根由 VC 根优先, 否则最近的构建标记
+  (compile_commands.json, CMakeLists.txt, meson.build, xmake.lua,
+  configure*, Makefile*, build.ninja, .pro); 构建系统按 CMake ->
+  Meson -> xmake -> Autotools -> qmake -> Make -> Ninja 顺序检测.
+- LSP: clangd 通过动态 contact 启动 (my-cpp-clangd-program 与
+  my-cpp-clangd-args), .dir-locals.el 里的设置对下一次启动生效.
+  默认参数: --background-index --background-index-priority=low
+  --pch-storage=memory --clang-tidy --completion-style=detailed
+  --header-insertion=iwyu --enable-config; 交叉编译时设
+  my-cpp-clangd-query-drivers. CMake buffer 接 neocmakelsp (首选)
+  或 cmake-language-server, 并注册共享操作 ,nb/,nt/,nd/,nl (不注册
+  ,nf: clang-format 不能格式化 CMake 文件).
+- 补全: company-capf (clangd) + company-dabbrev-code + company-files;
+  company-clang 被显式排除; clangd 缺失时 fastctags (Universal
+  Ctags) 兜底补全和跳转.
+- 格式化: apheleia + clang-format; 项目有 .clang-format 时用
+  --style=file, 否则回退 Google + 4 空格.
+- 诊断: Flymake + clangd (含 clang-tidy, 规则在 ~/.config/clangd/
+  config.yaml, 项目可放 .clangd 覆盖).
+- 调试: gdb-many-windows t + gdb-show-main t, 启动即多窗口布局.
+- 构建并行度: 并行构建显式传任务数 (CMake --parallel N, make -j N,
+  Bear 捕获同样 -j N), N 由 my-cpp-parallel-jobs 控制 (默认取 nproc).
+  裸 --parallel/-j 无上限, 实测曾把本机内存耗尽 (albert 项目), 所以
+  从不省略任务数.
+
+** 4.2 构建系统后端与命令
+
+| 系统     | configure                                          | build                        | test                          |
+|----------+----------------------------------------------------+------------------------------+-------------------------------|
+| CMake    | cmake -S root -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug | cmake --build dir --config Debug --parallel N | ctest --test-dir dir --build-config Debug --output-on-failure |
+| Meson    | meson setup build (已配置则 --reconfigure)          | meson compile -C dir         | meson test -C dir --print-errorlogs |
+| xmake    | xmake f --mode=debug; xmake project -k compile_commands .vscode | xmake                   | xmake test                    |
+| Autotools| NOCONFIGURE=1 ./autogen.sh (或 autoreconf -fi) + out-of-source ../configure | make -j N -C build  | make -C build check           |
+| Make     | 无需配置 (Bear 捕获编译命令)                        | make -j N (my-cpp-make-command) | 提示输入 test 命令            |
+| Ninja    | 无需配置                                           | ninja [-C dir]               | 提示输入 test 命令            |
+| qmake    | qmake <project>.pro (项目根)                        | make -j N (qmake 生成的 Makefile) | 提示输入 test 命令         |
+
+构建目录自动定位 (CMakeCache.txt, meson-private/coredata.dat,
+build.ninja); 有多个时提示选择, 配置时允许输入新目录. 表中的 N 为
+显式任务数 (my-cpp-parallel-jobs, 默认 nproc), 与 4.1 的并行度策略
+一致.
+
+** 4.3 编译数据库 (compile_commands.json)
+
+clangd 正常工作的前提. 流程:
+
+1. ,tc 配置: 成功后回调自动把数据库符号链接到项目根并校验.
+2. ,tj 捕获: Make/Ninja/qmake 项目用 Bear 捕获编译命令 (程序化调用
+   未给命令时回退到各构建系统的默认捕获命令; Make/qmake/Autotools
+   的默认捕获命令带 -j N, 大项目全量重捕获只需几分钟).
+3. ,tv 校验: 统计条目数, 结构无效数, 缺失源文件数 (原生 JSON 解析
+   + 目录缓存, 大数据库也快).
+
+** 4.4 语言专属键位 (,t 前缀)
+
+| 键位 | 命令                              | 用途                              |
+|------+-----------------------------------+-----------------------------------|
+| ,tc  | my-cpp-configure                  | 配置构建系统并导出编译数据库       |
+| ,tb  | my-cpp-run-build-command          | 自定义构建命令                     |
+| ,te  | my-cpp-run-test-command           | 自定义测试命令                     |
+| ,td  | my-cpp-cmake-debug-test           | GDB 调试单个 CTest (follow-fork) |
+| ,tj  | my-cpp-capture-compilation-database | Bear 捕获编译数据库             |
+| ,tv  | my-cpp-check-compilation-database | 校验编译数据库                     |
+| ,th  | my-cpp-switch-source-header       | 头/源切换 (优先问 clangd, 回退 ff-find-other-file) |
+| ,tw  | my-cpp-write-clang-format         | 写 4 空格 .clang-format           |
+
+** 4.5 工作流程
+
+1. 一次性初始化: ,tw 写 .clang-format -> ,tc 配置 + 生成数据库 ->
+   .gitignore 加 build/ compile_commands.json .cache/.
+2. 日常循环: 打开 .cpp (Eglot 自动起 clangd, 首次后台索引) -> 编辑
+   (company 补全, inlay hints, Flymake 诊断) -> 保存 (clang-format)
+   -> ,nb 构建 (M-g n / M-g p 跳编译错误) -> ,nt 测试 -> ,nd 调试
+   (C-x C-a C-b 断点, C-x C-a C-r 运行, C-x C-a C-n next, C-x C-a
+   C-s step, C-x C-a C-c continue) -> ,nr 重命名 / ,na code actions
+   -> magit 提交.
+3. 排查: 没有补全先查 compile_commands.json 与 ,ne 重连; include
+   不对用 clangd --check 并重跑 ,tc; 保存变 2 空格说明缺
+   .clang-format (,tw 生成); clangd 吃资源可去掉 --clang-tidy 或
+   completion-style 改 bundled.
+
+** 4.6 universal-ctags 与 clangd 的互补
+
+两条跳转链路并存, 互不冲突: C-] 走 fastctags (文本级, 快, 任何目录
+可用), ,vv / M-. 走 clangd (语义级, 精确, 需要编译数据库). 日常以
+clangd 为准, ctags 用于 clangd 缺失, 无编译数据库或超大代码库的快速
+定位; 答案不一致时以 clangd 为准确.
+
+* 5. Rust 层 (init-rust.el)
+
+** 5.1 设置
+
+- 主模式: rust-ts-mode (语法库可用时), 回退 rust-mode (MELPA), 两种
+  模式配置完全相同.
+- 缩进: 4 空格; rust-mode 额外开启 rust-indent-method-chain (方法链
+  对齐与 rustfmt 一致).
+- 运算符美化: prettify-symbols-mode (->, =>, && ...), 两种模式自带
+  prettify 表, 只需打开 minor mode.
+- 项目检测: 项目根取最近的 Cargo.toml (workspace 成员 crate 单独成
+  根, cargo 命令只作用于该成员); 非 git 目录用 workspace 根识别;
+  my-rust-cargo-markers-override-vc 控制 Cargo.toml 是否压过 VC 根
+  (默认 t 保持原行为, nil 时整个 workspace 一个项目一个服务器).
+- LSP: rust-analyzer 通过动态 contact 启动; 选项在
+  my-rust-analyzer-options (:check (:command "clippy") 让保存时检查
+  跑 clippy; :cargo (:targetDir t) 让检查不再持有 target/ 的 cargo
+  锁), .dir-locals.el 可按项目覆盖. my-rust-eglot-skip-regexp 阻止
+  在 ~/.cargo 与 ~/.rustup 源码里为每个 crate 起服务器 (跳进去的
+  文件由原项目服务器接管).
+- 补全: company-capf (rust-analyzer) + dabbrev + files.
+- 格式化: apheleia + rustfmt, 带 --edition (从最近的 Cargo.toml 读
+  取 edition, workspace 成员穿透到根; 找不到时回退 2024); 保存时
+  触发.
+- 诊断: Flymake + rust-analyzer (clippy 检查在保存时运行).
+- 构建并行度: my-rust-cargo-jobs (默认 4) 以 CARGO_BUILD_JOBS 环境变量
+  限制所有从 Emacs 启动的 cargo 构建与 rust-analyzer 的保存检查 (yazi
+  冷 release 构建实测峰值 ~3.4 GiB; cargo 默认每核一个任务, 会同时堆
+  起多个数 GiB 的 rustc 进程). cargo test 跑测试二进制不受此限制;
+  单次 cargo build -j N 可覆盖; nil 恢复 cargo 默认.
+
+** 5.2 语言专属键位 (,t 前缀)
+
+| 键位 | 命令                  | 用途                             |
+|------+-----------------------+----------------------------------|
+| ,tr  | my-rust-cargo-run     | cargo run (comint, 可交互)       |
+| ,tc  | my-rust-cargo-check   | cargo check (只类型检查)          |
+| ,tu  | my-rust-cargo-update  | cargo update                     |
+| ,ta  | my-rust-cargo-add     | cargo add (可带参数如 --features, 前缀参数加 --dev) |
+| ,td  | my-rust-cargo-doc     | cargo doc --open                 |
+| ,tx  | my-rust-cargo-clean   | cargo clean                      |
+| ,tb  | my-rust-cargo-command | 任意 cargo 子命令                 |
+
+共享键 ,nf 格式化当前 buffer (apheleia + rustfmt, 保光标), 带前缀
+参数时改为 cargo fmt 整个 crate; ,nl 是 cargo clippy; ,nd 启动
+rust-gdb / rust-lldb / gdb / lldb (my-rust-debugger 选择).
+
+** 5.3 工作流程
+
+1. 日常: 打开 .rs -> rust-analyzer 自动启动 -> company 补全 ->
+   保存 (rustfmt + clippy 检查) -> ,tc 快速检查 -> ,nb cargo build
+   (前缀参数 --release) -> ,nt cargo test (前缀参数 -- --nocapture)
+   -> ,tr cargo run -> ,nd 调试 (调试器命令行用
+   combine-and-quote-strings, 含空格路径也能用).
+2. 依赖: ,ta 加 crate, ,tu 更新, ,tx 清理, ,td 看文档.
+3. 大 workspace (如 yazi): 默认每个成员 crate 一个项目一个服务器;
+   想整个 workspace 一个服务器, 在 init.el 里 (init-rust 加载前)
+   setq my-rust-cargo-markers-override-vc nil.
+
+** 5.4 需要的系统程序
+
+rustup 工具链 (cargo, rustc, rustfmt, clippy), rust-analyzer, 调试用
+rust-gdb / rust-lldb 或 gdb / lldb. tree-sitter rust 语法库由配置自动
+安装 (有 rust-analyzer 时).
+
+* 6. tree-sitter 基础设施 (init-tree-sitter.el)
+
+- 语法库 (.so) 装在 ~/.emacs.d/tree-sitter, 自动加入加载路径.
+- c / cpp / cmake / python / rust 五个语法库有配方, 每个配方带语言
+  服务器守卫 (没装 clangd 就不装 c/cpp 语法库; cmake 语法库同理).
+  启动后空闲时 (仅交互会话) 自动安装缺失的语法库.
+- 安装默认在后台 Emacs 子进程里 git clone + 编译, 不冻结会话; 每个
+  配方按当前 tree-sitter ABI 版本选修订 (ABI<15 用固定 tag, ABI>=15
+  用 master).
+- 内置 ts 模式文件 (c-ts-mode.el, rust-ts-mode.el, cmake-ts-mode.el)
+  只在语法库就绪后才加载 (Emacs 30 下缺语法库加载会警告), 安装完成
+  后经 my-treesit-grammars-ready-hook 补加载并补绑 ,t 键.
+- treesit-auto 全局启用: 语法库出现即自动切换对应 ts 模式; 其自带
+  的下载安装关闭 (treesit-auto-install nil), 打开文件永不触发下载.
+
+* 7. 通用编辑增强 (与三个语言层配合)
+
+| 类别    | 正在使用                                                                                             | 未使用                 |
+|---------+------------------------------------------------------------------------------------------------------+------------------------|
+| 补全 UI | company (数字键选候选, prescient 排序)                                                               | corfu                  |
+| 模板    | yasnippet (M-j 展开) + abbrev                                                                        | -                      |
+| 括号    | paredit (Lisp) + electric-pair-mode (其他语言)                                                       | smartparens            |
+| 撤销    | undo-fu + 原生 undo-redo + ,su vundo 可视化                                                       | undo-tree (装了未启用) |
+| 结构化  | expand-region (,xx), evil 文本对象 (vad/vac/vaa 函数/类/参数, vag/vav/vai/vaf 括号/语句/字符串/路径) | -                      |
+| 搜索    | ast-grep (,ag/,as), my-git-grep (,gg), fastctags grep (,dd)                                          | -                      |
+
+常用导航键: ,vv 或 M-. 跳定义, M-, 跳回, C-M-, 再跳回, ,ii 符号大纲,
+,hh 折叠, ,wf 显示所在函数, C-] ctags 兜底跳转.
+
+* 8. 系统依赖清单 (汇总)
+
+| 语言   | 必需                                              | 可选                                                                                                                                             |
+|--------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------|
+| C/C++  | 编译器, clangd, clang-format                      | cmake/make/meson/ninja/xmake (按项目), bear (Make/Ninja), gdb/lldb, cppcheck, universal-ctags, neocmakelsp 或 cmake-language-server (CMake 文件) |
+| Rust   | rustup 工具链, rust-analyzer                      | rust-gdb/rust-lldb                                                                                                                               |
+| Python | basedpyright 或 pyrefly 或 pyright 或 pylsp, ruff | uv, pytest                                                                                                                                       |
+| Emacs  | 29.1+ (建议 30.1+), tree-sitter 支持              | -                                                                                                                                                |
+
