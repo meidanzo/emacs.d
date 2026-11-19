@@ -112,5 +112,4 @@
 ;; (turnon-keyfreq-mode)
 
 (provide 'init-keyfreq)
-(provide 'init-keyfreq)
 ;;; init-keyfreq.el ends here
