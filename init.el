@@ -111,11 +111,9 @@
   (require-init 'init-clipboard)
   (require-init 'init-gnus t)
   (require-init 'init-term-mode t)
-  (require-init 'init-web-mode t)
   ;; (require-init 'init-chinese t) ;; cannot be idle-required
   ;; need statistics of keyfreq asap
   (require-init 'init-keyfreq t)
-  (require-init 'init-httpd t)
 
   ;; projectile costs 7% startup time
 
@@ -139,7 +137,6 @@
   (require-init 'init-browser t)
   (require-init 'init-shackle t)
   (require-init 'init-dired t)
-  (require-init 'init-writting t)
   (require-init 'init-pdf t)
   (require-init 'init-misc t)
   (require-init 'init-LaTeX-mode)

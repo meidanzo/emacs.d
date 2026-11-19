@@ -3,6 +3,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 (when (boundp 'evil-mode)
   (general-imap ","
     (general-key-dispatch 'self-insert-command

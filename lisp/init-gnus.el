@@ -2,6 +2,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 ;; {{ bbdb setup
 (defun my-message-mode-hook-setup ()
   "Email composing set up."
@@ -85,3 +87,4 @@
 ;; }}
 
 (provide 'init-gnus)
+;;; init-gnus.el ends here

@@ -282,8 +282,8 @@ COUNT BEG END TYPE INCLUSIVE is used."
   "gl" 'org-latex-preview
   "$" 'org-end-of-line ; smarter behavior on headlines etc.
   "^" 'org-beginning-of-line ; ditto
-  "<" (lambda () (interactive) (org-demote-or-promote 1)) ; out-dent
-  ">" 'org-demote-or-promote ; indent
+  "<" 'org-do-promote
+  ">" 'org-do-demote
   (kbd "TAB") #'org-cycle)
 
 (evil-declare-key 'normal markdown-mode-map
@@ -524,7 +524,7 @@ If N > 0 and in js, only occurrences in current N lines are renamed."
   "k/" 'find-file-other-window
   "hf" 'find-function
   "hh" 'hs-toggle-hiding ; hide&show code block
-  "br" 'cleanup-buffer-safe ; formerly ,tr, freed for the Rust cargo prefix
+  "br" 'my-cleanup-buffer-safe ; formerly ,tr, freed for the Rust cargo prefix
   "tff" 'toggle-frame-fullscreen
   "tfm" 'toggle-frame-maximized
   "ci" 'evilnc-comment-or-uncomment-lines

@@ -3,6 +3,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later); modified by meidanzo, 2026.
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 ;; Avoid potential lag:
 ;; https://emacs.stackexchange.com/questions/28736/emacs-pointcursor-movement-lag/28746
 ;; `next-line' triggers the `format-mode-line' which triggers `projectile-project-name'
@@ -76,7 +78,6 @@
 ;; @see http://www.emacswiki.org/emacs/SavePlace
 (save-place-mode 1)
 
-;; {{ find-file-in-project (ffip)
 (with-eval-after-load 'find-file-in-project
   (defun my-search-git-reflog-code ()
     (let* ((default-directory (my-git-root-dir)))
@@ -84,18 +85,6 @@
                                        (read-string "Regex: ")))))
   (push 'my-search-git-reflog-code ffip-diff-backends)
   (setq ffip-match-path-instead-of-filename t))
-
-(defun my-neotree-project-dir ()
-  "Open NeoTree using the git root."
-  (interactive)
-  (let* ((project-dir (ffip-get-project-root-directory))
-         (file-name (buffer-file-name)))
-    (if project-dir
-        (progn
-          (neotree-dir project-dir)
-          (neotree-find file-name))
-      (message "Could not find git project root."))))
-;; }}
 
 ;; {{ dictionary setup
 (defun my-lookup-dict-org ()
@@ -171,24 +160,6 @@ FN checks these characters belong to normal word characters."
     rlt))
 
 (with-eval-after-load 'elec-pair
-  ;; {{ @see https://debbugs.gnu.org/cgi/bugreport.cgi?bug=55340
-  ;; `new-line-indent` disables `electric-indent-mode'
-  (defun my-electric-pair-open-newline-between-pairs-psif-hack (orig-func &rest args)
-    (ignore orig-func args)
-    (when (and (if (functionp electric-pair-open-newline-between-pairs)
-                   (funcall electric-pair-open-newline-between-pairs)
-                 electric-pair-open-newline-between-pairs)
-               (eq last-command-event ?\n)
-               (< (1+ (point-min)) (point) (point-max))
-               (eq (save-excursion
-                     (skip-chars-backward "\t\s")
-                     (char-before (1- (point))))
-                   (matching-paren (char-after))))
-      (save-excursion (newline-and-indent 1))))
-  (advice-add 'electric-pair-open-newline-between-pairs-psif
-              :around
-              #'my-electric-pair-open-newline-between-pairs-psif-hack)
-  ;; }}
   (setq electric-pair-inhibit-predicate 'my-electric-pair-inhibit))
 ;; }}
 
@@ -345,14 +316,12 @@ So it's at the top of clipboard manager."
 (defun my-extract-list-from-package-json ()
   "Extract package list from package.json."
   (interactive)
-  (let* ((str (my-use-selected-string-or-ask)))
-    (setq str (replace-regexp-in-string ":.*$\\|\"" "" str))
+  (let* ((str (replace-regexp-in-string ":.*$\\|\"" "" (my-use-selected-string-or-ask))))
     ;; join lines
-    (setq str (replace-regexp-in-string "[\r\n \t]+" " " str))
-    (my-copy-yank-str str)
+    (my-copy-yank-str (replace-regexp-in-string "[\r\n \t]+" " " str))
     (message "%s => clipboard & yank ring" str)))
 
-(defun my-insert-absolute-path()
+(defun my-copy-absolute-path()
   "Relative path to full path."
   (interactive)
   (let* ((str (my-use-selected-string-or-ask "Input relative path:"))
@@ -360,7 +329,7 @@ So it's at the top of clipboard manager."
     (my-copy-yank-str path)
     (message "%s => clipboard & yank ring" path)))
 
-(defun my-insert-relative-path()
+(defun my-copy-relative-path()
   "Full path to relative path."
   (interactive)
   (let* ((str (my-use-selected-string-or-ask "Input absolute path:"))
@@ -631,13 +600,6 @@ If the shell is already opened in some buffer, switch to that buffer."
   (setq auto-revert-verbose nil)
   (my-run-with-idle-timer 4 #'global-auto-revert-mode))
 
-;;----------------------------------------------------------------------------
-;; Don't disable narrowing commands
-;;----------------------------------------------------------------------------
-(put 'narrow-to-region 'disabled nil)
-(put 'narrow-to-page 'disabled nil)
-(put 'narrow-to-defun 'disabled nil)
-
 ;; my screen is tiny, so I use minimum eshell prompt
 (with-eval-after-load 'eshell
   (setq eshell-prompt-function
@@ -655,7 +617,9 @@ If the shell is already opened in some buffer, switch to that buffer."
   (interactive)
   (message (format "%d" (- (region-end) (region-beginning)))))
 
-;; show ascii table
+;; {{ ascii
+;; Local deviation: restored from the previous init-misc.el; upstream dropped
+;; the defun but still binds ("as" my-ascii-table) in init-hydra.el.
 (defun my-ascii-table ()
   "Print the ascii table."
   (interactive)
@@ -667,6 +631,7 @@ If the shell is already opened in some buffer, switch to that buffer."
       (setq i (+ i 1))
       (insert (format "%4d %c\n" i i))))
   (goto-char (point-min)))
+;; }}
 
 ;; {{ unique lines
 ;; https://gist.github.com/ramn/796527
@@ -686,9 +651,7 @@ Then insert it as a local file link in `org-mode'."
 
 (defun my-dired-copy-filename-as-kill-hack (&optional arg)
   "Copy file name/path from Dired buffer into clipboard.
-If ARG is not nil, copy full path.
-Press \"w\" to copy file name.
-Press \"C-u 0 w\" to copy full path."
+If ARG is not nil, copy full path."
   (ignore arg)
   (let ((str (current-kill 0)))
     (my-pclip str)
@@ -755,7 +718,7 @@ version control automatically."
 ;; midnight mode purges buffers which haven't been displayed in 3 days
 (my-run-with-idle-timer 4 #'midnight-mode)
 
-(defun cleanup-buffer-safe ()
+(defun my-cleanup-buffer-safe ()
   "Perform a bunch of safe operations on the whitespace content of a buffer.
 Does not indent buffer, because it is used for a `before-save-hook', and that
 might be bad."
@@ -800,12 +763,12 @@ might be bad."
 (defun nov-mode-hook-setup ()
   "Set up of `nov-mode'."
   (local-set-key (kbd "d")
-		 (lambda ()
-		   (interactive)
+         (lambda ()
+           (interactive)
            ;; go to end of word to workaround `nov-mode' bug
-		   (forward-word)
-		   (forward-char -1)
-		   (my-dict-complete-definition)))
+           (forward-word)
+           (forward-char -1)
+           (my-dict-complete-definition)))
   (local-set-key (kbd ";") 'my-hydra-ebook/body)
   (local-set-key (kbd "w") #'mybigword-big-words-in-current-window))
 (add-hook 'nov-mode-hook 'nov-mode-hook-setup)
@@ -841,14 +804,6 @@ might be bad."
         (t
          (error-message-string err))))))
   (advice-add 'nov-content-unique-identifier :around #'my-nov-content-unique-identifier))
-;; }}
-
-;; {{ octave
-(defun octave-mode-hook-setup ()
-  "Set up of `octave-mode'."
-  (setq-local comment-start "%")
-  (setq-local comment-add 0))
-(add-hook 'octave-mode-hook 'octave-mode-hook-setup)
 ;; }}
 
 ;; {{ wgrep setup
@@ -1357,20 +1312,26 @@ If N is 2, list files in my recent 20 commits."
   (interactive "P")
   (my-ensure 'recentf)
   (my-ensure 'project)
-  (unless n (setq n 0))
   (recentf-mode 1)
-  (let* ((files (mapcar #'substring-no-properties recentf-list))
-         (root (ffip-project-root))
-         (root-dir (if root (file-truename root)))
-         (hint "Recent files: ")
-         f)
+  (let* ((files recentf-list)
+         hint)
     (cond
-     ((and (eq n 1) root-dir)
-      (setq hint (format "Recent files in %s: " root-dir))
-      (setq files (delq nil (delete-dups (mapcar (lambda (f) (my-path-in-directory-p f root-dir)) files)))))
+     ((eq n 1)
+      (let* ((root (ffip-project-root))
+             (root-dir (if root (file-truename root))))
+        (setq hint (format "Recent files in %s: " root-dir))
+        (setq files
+              (delete-dups
+               (cl-remove-if-not
+                (lambda (f)
+                  (file-in-directory-p f root-dir))
+                files)))))
      ((eq n 2)
-      (setq hint (format "Files in recent Git commits: "))
-      (setq files (my-git-recent-files))))
+      (setq hint (format "Files in recent 10 days Git commits: "))
+      (setq files (my-git-recent-files)))
+
+     (t
+      (setq hint "Recent files: ")))
 
     (unless (string-empty-p (setq f (completing-read hint files)))
       ;; return file buffer if possible
@@ -1451,6 +1412,104 @@ If it's on, disable it and restore single window."
 ;; }}
 
 (electric-pair-mode 1)
+
+;; {{ simple-httpd setup
+;; per project setup may be better
+;; (setq httpd-root "/var/www")
+(setq httpd-port 4444)
+(defun httpd-restart-now ()
+  "Restart http server."
+  (interactive)
+  (httpd-stop)
+  (httpd-start)
+  (message "http://localhost:%d/ at %s restarted"
+           httpd-port httpd-root))
+
+(defun httpd-restart-at-default-directory ()
+  "Restart http server at default directory."
+  (interactive)
+  (setq httpd-root default-directory)
+  (httpd-restart-now))
+;; }}
+
+;; {{ web
+(defun web-mode-hook-setup ()
+  "Set up `web-mode'."
+  (unless (my-buffer-file-temp-p)
+    (setq-local wucuo-flyspell-check-doublon nil)
+    ;; `web-mode-yasnippet-exit-hook' indents text generated by yasnippet
+    ;; I prefer controlling indention manually
+    (remove-hook 'yas-after-exit-snippet-hook #'web-mode-yasnippet-exit-hook t)))
+(add-hook 'web-mode-hook 'web-mode-hook-setup)
+
+(with-eval-after-load 'web-mode
+  ;; make org-mode export fail, I use evil and evil-matchit
+  ;; to select text, so expand-region.el is not used
+  (remove-hook 'web-mode-hook #'er/add-web-mode-expansions)
+  (setq web-mode-enable-auto-closing t) ; enable auto close tag in text-mode
+  (setq web-mode-enable-auto-pairing t)
+  (setq web-mode-auto-close-style 2)
+  (setq web-mode-enable-css-colorization t)
+  ;; Local deviation: imenu regexps (incl. Angular) carried over from the
+  ;; deleted init-web-mode.el; upstream dropped them during the relocation.
+  (setq web-mode-imenu-regexp-list
+        '(("<\\(h[1-9]\\)\\([^>]*\\)>\\([^<]*\\)" 1 3 ">" nil)
+          ("^[ \t]*<\\([@a-z]+\\)[^>]*>? *$" 1 " id=\"\\([a-zA-Z0-9_]+\\)\"" "#" ">")
+          ("^[ \t]*<\\(@[a-z.]+\\)[^>]*>? *$" 1 " contentId=\"\\([a-zA-Z0-9_]+\\)\"" "=" ">")
+          ;; angular imenu
+          (" \\(ng-[a-z]*\\)=\"\\([^\"]+\\)" 1 2 "="))))
+;; }}
+
+
+;; {{ Smart capitalization, case conversion, and punctuation correction.
+(defun my-convert-punctuation (rg rp)
+  "Look for regexp RG around point, and replace with RP.
+Only applies to `text-mode'."
+  (let ((f "\\(%s\\)\\(%s\\)")
+        (space "[[:blank:]\n\r]*"))
+    (when (and (derived-mode-p 'text-mode)
+               (or (looking-at (format f space rg))
+                   (looking-back (format f rg space)
+                                 (max (point-min) (- (point) 100)))))
+      (replace-match rp nil nil nil 1))))
+
+(defun my-call-subword-cmd (fn)
+  "Run function FN."
+  (my-ensure 'subword)
+  (call-interactively fn))
+
+(defun my-capitalize ()
+  "Capitalize region or word.
+Also converts commas to full stops, and removes
+an extra space at beginning of line."
+  (interactive)
+  (my-convert-punctuation "," ".")
+  (if (use-region-p)
+      (call-interactively #'capitalize-region)
+    (when (looking-at "^ ")
+      (delete-char 1))
+    (my-call-subword-cmd #'subword-capitalize)))
+
+(defun my-downcase ()
+  "Downcase region or word.
+Also converts full stops to commas."
+  (interactive)
+  (my-convert-punctuation "\\." ",")
+  (if (use-region-p)
+      (call-interactively #'downcase-region)
+    (my-call-subword-cmd #'subword-downcase)))
+
+(defun my-upcase ()
+  "Upcase region or word."
+  (interactive)
+  (if (use-region-p)
+      (call-interactively #'upcase-region)
+    (my-call-subword-cmd #'subword-upcase)))
+
+(global-set-key (kbd "M-c") #'my-capitalize)
+(global-set-key (kbd "M-l") #'my-downcase)
+(global-set-key (kbd "M-u") #'my-upcase)
+;; }}
 
 (provide 'init-misc)
 ;;; init-misc.el ends here
