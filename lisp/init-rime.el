@@ -303,7 +303,7 @@ This function must be side-effect free and UI-agnostic."
   ;; press "/" to turn off rime
   ;; (define-key rime-mode-map (kbd "/") #'my-toggle-input-method)
   ;; C/C++ 代码中使用"/" 不方便, 改为"`"
-  (define-key rime-mode-map (kbd "`") #'my-toggle-input-method)
+  ;; (define-key rime-mode-map (kbd "`") #'my-toggle-input-method)
 
   ;; Enter 键行为, t: 提交原始输入
   (setq rime-return-insert-raw t)
