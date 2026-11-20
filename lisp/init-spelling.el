@@ -200,5 +200,33 @@ ORIG-FUNC and ARGS are used."
   ;; spell check buffer every 30 seconds
   (setq wucuo-update-interval 2))
 
+;; {{ 消除 "Blocking call to accept-process-output with quit inhibited!!"
+;; wucuo 的检查只由 `after-save-hook' 触发 (见 `wucuo-mode-on'), 而本配置中
+;; auto-save-visited-mode (init-misc.el) 由 idle timer 每 0.5 秒空闲调用
+;; `save-some-buffers'. Emacs 的 timer 回调运行在 `inhibit-quit' 为 t 的
+;; 上下文 (keyboard.c 中 timer handler 前 specbind), 于是 wucuo ->
+;; `flyspell-buffer' -> `flyspell-region' -> `flyspell-external-point-words'
+;; -> `flyspell-word' 内部等待 ispell 响应的无超时
+;; `(accept-process-output ispell-process)' (flyspell.el, "Wait until ispell
+;; has processed word.") 满足 process.c 的警告条件, 每检查一个错词就打印一次
+;; "Blocking call to accept-process-output with quit inhibited!!".
+;; 用 `with-local-quit' 包裹 `flyspell-word': 进入时临时允许 quit, 警告条件
+;; 随之消失, 且 C-g 可以中断卡住的 ispell 查询. 这与上游
+;; `flyspell-post-command-hook' 用 `with-local-quit' 包裹拼写检查的做法一致.
+(defun my-flyspell-word-with-local-quit (orig-fun &rest args)
+  "Call ORIG-FUN with quitting temporarily allowed.
+
+ORIG-FUN is `flyspell-word'; ARGS are passed through unchanged.
+Used as :around advice so that the blocking wait inside
+`flyspell-word' neither triggers the C-level \"Blocking call to
+accept-process-output with quit inhibited!!\" warning nor hangs
+uninterruptibly when called from idle timers."
+  (with-local-quit
+    (apply orig-fun args)))
+
+(with-eval-after-load 'flyspell
+  (advice-add 'flyspell-word :around #'my-flyspell-word-with-local-quit))
+;; }}
+
 (provide 'init-spelling)
 ;;; init-spelling.el ends here
