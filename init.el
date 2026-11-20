@@ -12,6 +12,21 @@
 (setq user-init-file (or load-file-name (buffer-file-name)))
 (setq user-emacs-directory (file-name-directory user-init-file))
 
+;; Never JIT-compile the personal init files: they rely on macros that
+;; only exist at runtime (`my-comma-leader-def' from init-evil.el, evil's
+;; text-object macros) and on cross-file functions, so an async-native-
+;; compiled copy can load before its dependencies and break every later
+;; session (observed: "Invalid function: my-comma-leader-def", then
+;; "void-variable inner-name" from a stale init-evil eln).  This must run
+;; before the first `require-init'.  The option comes from comp.el
+;; (Emacs 29) / comp-run.el (Emacs 30), which load only when a compilation
+;; is about to start, so it is void here: create it here; a later
+;; `defcustom' never overwrites a bound variable.  The old
+;; `native-comp-deferred-compilation-deny-list' is an obsolete, unread
+;; name since Emacs 29.1, so it is deliberately not set.
+(setq native-comp-jit-compilation-deny-list
+      (list (concat (regexp-quote user-emacs-directory) "lisp/")))
+
 (defvar my-debug nil "Enable debug mode.")
 
 (defconst my-wsl-p (and (eq system-type 'gnu/linux)

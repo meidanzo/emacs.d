@@ -55,7 +55,8 @@
 ;; User-installed tools such as Ruff and basedpyright commonly live in
 ;; ~/.local/bin, which desktop Emacs may not inherit from the shell.
 (defun my-python-add-local-bin-to-path ()
-  "Add the user's ~/.local/bin to `exec-path' and PATH when it exists."
+  "Add the user's ~/.local/bin to the variable `exec-path' and to PATH.
+Do nothing when the directory does not exist."
   (let* ((directory (expand-file-name "~/.local/bin"))
          (separator (if (characterp path-separator)
                         (char-to-string path-separator)
@@ -111,17 +112,46 @@ a remote host.  Remote directories are skipped because this runs on every
 `project-current' call and each marker probe would be a round trip."
   (unless (or (file-remote-p directory)
               (ignore-errors (vc-responsible-backend directory)))
-    (let ((roots (delq nil
-                       (mapcar (lambda (marker)
-                                 (locate-dominating-file directory marker))
-                               my-python-project-markers))))
+    ;; Expand before comparing lengths: `locate-dominating-file' abbreviates
+    ;; $HOME to ~, so an unabbreviated root above $HOME (/home/) could look
+    ;; longer than a nearer root below it (~/proj/).
+    (let ((roots (mapcar #'expand-file-name
+                         (delq nil
+                               (mapcar (lambda (marker)
+                                         (locate-dominating-file directory marker))
+                                       my-python-project-markers)))))
       (when roots
         (cons 'transient
               (car (sort roots (lambda (left right)
                                  (> (length left) (length right))))))))))
 
 (with-eval-after-load 'project
-  (add-hook 'project-find-functions #'my-python-project-try-local t))
+  ;; Move it before the built-in `project-try-vc': when its ancestor walk
+  ;; signals (an unreadable parent directory, say) Emacs 30 aborts the
+  ;; whole `project-find-functions' chain and every find function after
+  ;; it would never run.  This function self-skips version-controlled
+  ;; directories, so the VC root still wins there.  Inserting just before
+  ;; `project-try-vc' also keeps the load-order of the three language
+  ;; find functions (python, C/C++, Rust), so overlapping markers keep
+  ;; their old winner.
+  ;; A plain `setq', not `add-hook': its third argument has meant DEPTH
+  ;; since Emacs 28, and the legacy APPEND value t would reorder the
+  ;; list against add-hook's depth bookkeeping.
+  (let* ((functions project-find-functions)
+         (rest (memq 'project-try-vc functions))
+         (head (if rest (take (- (length functions) (length rest))
+                              functions)
+                 functions)))
+    ;; A config reload re-runs this block; a previous run already put
+    ;; the function in place.
+    (unless (memq 'my-python-project-try-local head)
+      (let* ((base (delq 'my-python-project-try-local functions))
+             (tail (memq 'project-try-vc base))
+             (n (if tail (- (length base) (length tail)) (length base))))
+        (setq project-find-functions
+              (append (take n base)
+                      (list 'my-python-project-try-local)
+                      (nthcdr n base)))))))
 
 ;;; Indentation
 
@@ -136,7 +166,7 @@ a remote host.  Remote directories are skipped because this runs on every
 
 (defun my-python-style-setup ()
   "Four-space indentation and no tabs in the current Python buffer.
-Both python-mode and python-ts-mode default to four spaces already;
+Both `python-mode' and `python-ts-mode' default to four spaces already;
 set it explicitly, like the C/C++ and Rust layers do."
   (setq-local python-indent-offset 4
               indent-tabs-mode nil))
@@ -273,24 +303,55 @@ With prefix argument CREATE, create a new environment instead."
         (my-python-create-venv directory))))))
 
 (defun my-python-auto-activate-venv ()
-  "Activate the current project's .venv when it exists."
+  "Activate the current project's .venv when it exists.
+When this project has no .venv, deactivate an environment left active by
+a previously visited project: pyvenv is session-global, and its entries in
+the variable `exec-path' would otherwise resolve this project's commands
+through another project's interpreter (observed: qutebrowser's venv python
+leaking into the venv-less blanket)."
   (when my-python-auto-activate-venv
-    (when-let* ((venv (my-python--project-venv)))
-      (unless (and (bound-and-true-p pyvenv-virtual-env)
-                   (equal (file-name-as-directory venv)
-                          pyvenv-virtual-env))
-        (my-activate-python-venv venv)))))
+    (let ((venv (my-python--project-venv)))
+      (if venv
+          (unless (and (bound-and-true-p pyvenv-virtual-env)
+                       (equal (file-name-as-directory venv)
+                              pyvenv-virtual-env))
+            (my-activate-python-venv venv))
+        ;; No .venv here.  Only pyvenv itself knows how to undo its
+        ;; activation; its variable being set proves it is loaded.
+        (when (bound-and-true-p pyvenv-virtual-env)
+          (pyvenv-deactivate))))))
 
 ;;; Tree-sitter mode
 
-;; Prepend instead of `setq': replacing the whole alist would discard
-;; remappings added by other packages or by the user.
-(when (and (fboundp 'treesit-available-p)
-           (treesit-available-p)
-           (treesit-language-available-p 'python))
-  (setq major-mode-remap-alist
-        (cons '(python-mode . python-ts-mode)
-              (assq-delete-all 'python-mode major-mode-remap-alist))))
+(defcustom my-python-use-ts-mode t
+  "Whether to prefer `python-ts-mode' over `python-mode'.
+When non-nil, `my-python-remap-ts-mode' remaps `python-mode' to
+`python-ts-mode' whenever the Python grammar is available, including
+after background grammar installs.  Disable this to keep `python-mode'
+regardless of the grammar."
+  :type 'boolean
+  :group 'python)
+
+(defun my-python-remap-ts-mode ()
+  "Remap `python-mode' to `python-ts-mode' when the Python grammar exists.
+Prepend instead of `setq': replacing the whole alist would discard
+remappings added by other packages or by the user.  Also run from
+`my-treesit-grammars-ready-hook', so a grammar built in the background
+after startup takes effect without restarting Emacs.  Honors
+`my-python-use-ts-mode', the explicit opt-out."
+  (when (and my-python-use-ts-mode
+             (fboundp 'treesit-available-p)
+             (treesit-available-p)
+             (treesit-language-available-p 'python))
+    (setq major-mode-remap-alist
+          (cons '(python-mode . python-ts-mode)
+                (assq-delete-all 'python-mode major-mode-remap-alist)))))
+
+(my-python-remap-ts-mode)
+;; `add-hook' creates the hook variable when init-tree-sitter.el has not
+;; defined it yet, and its later `defvar' keeps the value, so the load
+;; order of the two files does not matter here.
+(add-hook 'my-treesit-grammars-ready-hook #'my-python-remap-ts-mode)
 
 ;;; LSP
 
@@ -298,6 +359,10 @@ With prefix argument CREATE, create a new environment instead."
 ;; -90 depth keeps it ahead of `my-python-eglot-ensure'.
 (dolist (hook my-python-mode-hooks)
   (add-hook hook #'my-python-auto-activate-venv -90))
+
+;; Defined by eglot.el; the declarations silence the byte compiler.
+(defvar eglot-server-programs)
+(declare-function eglot-alternatives "eglot")
 
 (with-eval-after-load 'eglot
   ;; Replace Emacs' own `(python-mode python-ts-mode)' entry instead of
@@ -361,6 +426,9 @@ Skips temporary buffers and Python embedded in Org files."
 (dolist (hook my-python-mode-hooks)
   (add-hook hook #'my-python-enable-apheleia))
 
+;; Defined by apheleia.el; the declaration silences the byte compiler.
+(defvar apheleia-mode-alist)
+
 (with-eval-after-load 'apheleia
   (setf (alist-get 'python-mode apheleia-mode-alist) 'ruff
         (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff))
@@ -370,11 +438,26 @@ Skips temporary buffers and Python embedded in Org files."
 ;; Python commands run in compilation buffers in Comint mode (like the
 ;; C/C++ and Rust layers): errors are clickable and the buffer accepts
 ;; stdin, so `my-python-run' can drive interactive programs.
+(defun my-python--venv-executable (name)
+  "Return program NAME from the current project's .venv, or nil.
+`pyvenv' activates one environment for the whole Emacs session by editing
+the variable `exec-path' and PATH, and `my-python-auto-activate-venv'
+only runs when a Python file is opened.  After visiting a file of project
+B, a command run from a buffer of project A would resolve NAME through
+B's environment, so project commands ask the buffer's own .venv first."
+  (when-let* ((venv (my-python--project-venv)))
+    (let ((exec-path (list (expand-file-name "bin" venv)
+                           (expand-file-name "Scripts" venv))))
+      (executable-find name))))
+
 (defun my-python-program ()
   "Return the Python interpreter to use for project commands.
-Prefer `python3' then `python' through `exec-path', so an activated
-venv's interpreter wins; fall back to the name `python3'."
-  (or (executable-find "python3")
+Prefer the current project's .venv, then `python3' and `python' through
+the variable `exec-path' (an activated venv's interpreter wins there);
+fall back to the name `python3'."
+  (or (my-python--venv-executable "python")
+      (my-python--venv-executable "python3")
+      (executable-find "python3")
       (executable-find "python")
       "python3"))
 
@@ -426,13 +509,17 @@ environments, caches, build output) are skipped."
 This is the Python implementation behind the shared `,nl' lint key
 bound by init-ide.el."
   (interactive)
-  (unless (executable-find "ruff")
-    (user-error "ruff is not installed"))
-  (let ((default-directory (or (my-python--project-root) default-directory)))
-    ;; The concise format is one `file:line:col: CODE message' line per
-    ;; finding, which `compilation-mode' always makes clickable; ruff's
-    ;; default multi-line format has changed between releases.
-    (compile "ruff check --output-format=concise ." t)))
+  (let ((ruff (or (my-python--venv-executable "ruff")
+                  (executable-find "ruff"))))
+    (unless ruff
+      (user-error "Ruff is not installed"))
+    (let ((default-directory (or (my-python--project-root) default-directory)))
+      ;; The concise format is one `file:line:col: CODE message' line per
+      ;; finding, which `compilation-mode' always makes clickable; ruff's
+      ;; default multi-line format has changed between releases.
+      (compile (concat (shell-quote-argument ruff)
+                       " check --output-format=concise .")
+               t))))
 
 (defun my-python-format ()
   "Format the current Python buffer with apheleia (ruff).
@@ -441,7 +528,7 @@ bound by init-ide.el."
   (interactive)
   (if (fboundp 'apheleia-format-buffer)
       (call-interactively #'apheleia-format-buffer)
-    (user-error "apheleia is not available; cannot format the buffer")))
+    (user-error "Apheleia is not available; cannot format the buffer")))
 
 (defun my-python--module-available-p (module)
   "Return non-nil when the project's Python interpreter can import MODULE.
@@ -454,7 +541,7 @@ A missing interpreter counts as \"not available\" instead of signalling."
                    module)))))
 
 (defun my-python-test (&optional args)
-  "Run the project's tests with `python -m pytest'.
+  "Run the project's test suite with `python -m pytest'.
 With prefix argument ARGS, prompt for extra pytest arguments.
 This is the Python implementation behind the shared `,nt' test key
 bound by init-ide.el."
@@ -463,7 +550,7 @@ bound by init-ide.el."
     ;; Ask the interpreter that will run the tests, not the PATH: a
     ;; pytest executable elsewhere says nothing about this environment.
     (unless (my-python--module-available-p "pytest")
-      (user-error "pytest is not installed for %s" (my-python-program)))
+      (user-error "The pytest module is not installed for %s" (my-python-program)))
     (compile (concat (shell-quote-argument (my-python-program))
                      " -m pytest"
                      (when args
@@ -471,7 +558,7 @@ bound by init-ide.el."
              t)))
 
 (defun my-python--pip-command ()
-  "Return the shell command prefix that installs packages (without `install').
+  "Return the shell command prefix for installing packages (without `install').
 Prefer `uv pip': environments created by `uv venv' contain no pip, so
 `python -m pip' fails there, while `uv pip' works in every environment,
 and refuses to touch the system Python when none is active."
@@ -572,7 +659,7 @@ SYMBOL defaults to the symbol at point."
         (princ "pydoc failed\n")))))
 
 (defun my-python-command (command)
-  "Run an arbitrary project command in the project root."
+  "Run COMMAND as a project command in the project root."
   (interactive (list (read-string "Project command: ")))
   (when (string-empty-p command)
     (user-error "Enter a command"))
@@ -630,24 +717,30 @@ the default.  This is the Python implementation behind the shared
 ;; buffers; the global "," keys stay available in Python buffers
 ;; through keymap fallback.
 (defconst my-python-keymaps '(python-mode-map python-ts-mode-map)
-  "Mode maps where the Python-specific ',' 't' keys are active.")
+  "Mode maps where the Python-specific ,t keys are active.")
 
-;; python.el defines both mode maps; it is built in.
-(require 'python)
-
-;; This file loads before init-evil.el, so wait for init-evil (which
+;; python.el defines both mode maps and is built in, but it is not worth
+;; loading at startup just for the maps: bind the keys when it loads, that
+;; is, when the first Python buffer is opened.
+;;
+;; This file loads before init-evil.el, so also wait for init-evil (which
 ;; defines `my-comma-leader-def') rather than for evil itself: evil
 ;; finishes loading inside init-evil.el, before the definer exists.
-(with-eval-after-load 'init-evil
-  (my-comma-leader-def
-    :keymaps my-python-keymaps
-    "tr" #'my-python-run
-    "tc" #'my-python-check
-    "tu" #'my-python-update-deps
-    "ta" #'my-python-add-dep
-    "td" #'my-python-pydoc
-    "tx" #'my-python-clean
-    "tb" #'my-python-command))
+(with-eval-after-load 'python
+  (with-eval-after-load 'init-evil
+    ;; Expand at run time: `my-comma-leader-def' is a macro without a
+    ;; function cell, so a file compiled without init-evil loaded would
+    ;; turn a direct call into a broken function call.
+    (eval (macroexpand
+           '(my-comma-leader-def
+             :keymaps my-python-keymaps
+             "tr" #'my-python-run
+             "tc" #'my-python-check
+             "tu" #'my-python-update-deps
+             "ta" #'my-python-add-dep
+             "td" #'my-python-pydoc
+             "tx" #'my-python-clean
+             "tb" #'my-python-command)))))
 
 (provide 'init-python)
 ;;; init-python.el ends here

@@ -255,7 +255,33 @@ Remote directories are skipped because this runs on every
   (if my-rust-cargo-markers-override-vc
       (dolist (marker '("Cargo.toml" "Cargo.lock"))
         (add-to-list 'project-vc-extra-root-markers marker))
-    (add-hook 'project-find-functions #'my-rust-project-try-local t)))
+    ;; Move it before the built-in `project-try-vc': when its ancestor
+    ;; walk signals (an unreadable parent directory, say) Emacs 30
+    ;; aborts the whole `project-find-functions' chain and every find
+    ;; function after it would never run.  This function self-skips
+    ;; version-controlled directories, so the VC root still wins there.
+    ;; Inserting just before `project-try-vc' keeps the load-order of
+    ;; the three language find functions (python, C/C++, Rust), so
+    ;; overlapping markers keep their old winner.
+    ;; A plain `setq', not `add-hook': its third argument has meant
+    ;; DEPTH since Emacs 28, and the legacy APPEND value t would
+    ;; reorder the list against add-hook's depth bookkeeping.
+    (let* ((functions project-find-functions)
+           (rest (memq 'project-try-vc functions))
+           (head (if rest (take (- (length functions) (length rest))
+                                functions)
+                   functions)))
+      ;; A config reload re-runs this block; a previous run already put
+      ;; the function in place.
+      (unless (memq 'my-rust-project-try-local head)
+        (let* ((base (delq 'my-rust-project-try-local functions))
+               (tail (memq 'project-try-vc base))
+               (n (if tail (- (length base) (length tail))
+                    (length base))))
+          (setq project-find-functions
+                (append (take n base)
+                        (list 'my-rust-project-try-local)
+                        (nthcdr n base))))))))
 
 (defun my-rust-project-root ()
   "Return the current Rust project root directory.
@@ -300,6 +326,9 @@ Eglot calls this each time it starts a server (the extra arguments it may
 pass are ignored), so changes to `my-rust-analyzer-options' -- including
 directory-local values -- apply to the next server."
   (list "rust-analyzer" :initializationOptions my-rust-analyzer-options))
+
+;; Defined by eglot.el; the declaration silences the byte compiler.
+(defvar eglot-server-programs)
 
 (with-eval-after-load 'eglot
   ;; `setf' + `alist-get' with `equal' replaces an entry when one exists
@@ -387,6 +416,10 @@ workspace root."
         (setq directory (my-rust--parent-manifest-directory directory))))
     edition))
 
+;; Defined by apheleia.el; the declarations silence the byte compiler.
+(defvar apheleia-formatters)
+(defvar apheleia-mode-alist)
+
 (with-eval-after-load 'apheleia
   (setf (alist-get 'rustfmt apheleia-formatters)
         '("rustfmt" "--quiet" "--emit" "stdout" "--edition"
@@ -425,7 +458,7 @@ work; compiler errors stay clickable."
   (my-rust-cargo-compile (my-rust-project-root) "run"))
 
 (defun my-rust-cargo-test (&optional nocapture)
-  "Run the crate's tests with `cargo test'.
+  "Run the crate's test suite with `cargo test'.
 With prefix argument NOCAPTURE, add `-- --nocapture' so `println!'
 output in tests is shown."
   (interactive "P")
@@ -461,7 +494,7 @@ rewrites the files on disk under the open buffers."
    (whole-crate (my-rust-cargo-fmt))
    ((fboundp 'apheleia-format-buffer)
     (call-interactively #'apheleia-format-buffer))
-   (t (user-error "apheleia is not available; use a prefix argument for `cargo fmt'"))))
+   (t (user-error "Apheleia is not available; use a prefix argument for `cargo fmt'"))))
 
 (defun my-rust-cargo-update ()
   "Update dependencies with `cargo update'."
@@ -495,9 +528,10 @@ With prefix argument DEV, add it under [dev-dependencies]."
   (my-rust-cargo-compile (my-rust-project-root) "clean"))
 
 (defun my-rust-cargo-command (command)
-  "Run an arbitrary cargo subcommand in the project root.
-Prompt is prefilled with \"cargo \", so type only the subcommand and
-its arguments, for example \"build --release\"."
+  "Run COMMAND as a cargo subcommand in the project root.
+COMMAND may include the \"cargo \" prefix.  The prompt is prefilled
+with it, so type only the subcommand and its arguments, for example
+\"build --release\"."
   (interactive (list (read-string "Cargo command: " "cargo ")))
   (my-rust-cargo-compile
    (my-rust-project-root)
@@ -567,48 +601,65 @@ starts in target/debug/ when that directory exists."
 ;; buffers; the global "," keys stay available in Rust buffers
 ;; through keymap fallback.
 (defconst my-rust-keymaps '(rust-ts-mode-map rust-mode-map)
-  "Mode maps where the cargo-specific ',' 't' keys are active.")
+  "Mode maps where the cargo-specific ,t keys are active.")
 
 ;; The mode maps exist only after their libraries load.  rust-ts-mode
 ;; (built into Emacs) warns when it loads while the grammar is missing,
 ;; so it loads only once the grammar exists; on a fresh install the
 ;; background install (init-tree-sitter.el) runs the loader again from
 ;; `my-treesit-grammars-ready-hook'.
-(ignore-errors (require 'rust-mode))
+;; rust-mode (MELPA) is not required here: loading it at startup just for
+;; its map costs time in every session, so its keys are bound from
+;; `with-eval-after-load' below, when the first buffer loads it.
 
 (defun my-rust-load-ts-mode ()
-  "Load the built-in `rust-ts-mode' once the grammar is installed."
-  (when (my-treesit-grammar-available-p 'rust)
+  "Load the built-in `rust-ts-mode' once the grammar is installed.
+Does nothing when init-tree-sitter.el has not been loaded."
+  (when (and (fboundp 'my-treesit-grammar-available-p)
+             (my-treesit-grammar-available-p 'rust))
     (ignore-errors (require 'rust-ts-mode))))
 
 (my-rust-load-ts-mode)
 (add-hook 'my-treesit-grammars-ready-hook #'my-rust-load-ts-mode)
 
 (defmacro my-rust-bind-t-keys ()
-  "Bind the cargo `,' `t' keys in every Rust mode map that exists yet.
-The tree-sitter mode map exists only after its file loads, which happens
-once the grammar is installed, so the keys are bound again from its
-`with-eval-after-load' hook."
-  '(my-comma-leader-def
-    :keymaps (seq-filter #'boundp my-rust-keymaps)
-    "tr" #'my-rust-cargo-run
-    "tc" #'my-rust-cargo-check
-    "tu" #'my-rust-cargo-update
-    "ta" #'my-rust-cargo-add
-    "td" #'my-rust-cargo-doc
-    "tx" #'my-rust-cargo-clean
-    "tb" #'my-rust-cargo-command))
+  "Bind the cargo ,t keys in every Rust mode map that exists yet.
+A mode map exists only after its file loads, which happens once the
+grammar is installed or the first Rust buffer opens, so the keys are
+bound again from each mode file's `with-eval-after-load' hook.  Does
+nothing while no mode map exists: an empty `:keymaps' would make
+`general-def' bind into the global evil map."
+  '(let ((maps (seq-filter #'boundp my-rust-keymaps)))
+     (when maps
+       ;; Expand at run time: `my-comma-leader-def' is a macro without
+       ;; a function cell, so a file compiled without init-evil loaded
+       ;; would turn a direct call into a broken function call.
+       (eval (macroexpand
+              `(my-comma-leader-def
+                :keymaps ',maps
+                "tr" #'my-rust-cargo-run
+                "tc" #'my-rust-cargo-check
+                "tu" #'my-rust-cargo-update
+                "ta" #'my-rust-cargo-add
+                "td" #'my-rust-cargo-doc
+                "tx" #'my-rust-cargo-clean
+                "tb" #'my-rust-cargo-command))))))
 
 ;; Wait for init-evil rather than for evil itself (like init-python.el):
 ;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
 ;; loading inside it, before the definer exists.
 (with-eval-after-load 'init-evil (my-rust-bind-t-keys))
-(with-eval-after-load 'rust-ts-mode (my-rust-bind-t-keys))
+;; A mode file may load before init-evil has defined the definer, so each
+;; of these waits for it as well.
+(with-eval-after-load 'rust-mode
+  (with-eval-after-load 'init-evil (my-rust-bind-t-keys)))
+(with-eval-after-load 'rust-ts-mode
+  (with-eval-after-load 'init-evil (my-rust-bind-t-keys)))
 
 ;;; Existing buffers
 
 (defun my-rust-configure-existing-buffers ()
-  "Apply Rust setup to buffers that already exist when this file loads."
+  "Apply Rust setup to buffers that already exist when this file is loaded."
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
       (when (and buffer-file-name

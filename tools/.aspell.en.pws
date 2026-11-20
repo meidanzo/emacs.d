@@ -1,4 +1,4 @@
-personal_ws-1.1 en 378
+personal_ws-1.1 en 381
 acodec
 adoc
 aider
@@ -57,6 +57,7 @@ dabbrev
 davmail
 debian
 defalias
+defcustom
 defun
 desc
 dianyou
@@ -86,6 +87,7 @@ elc
 eldoc
 elete
 elisp
+eln
 elnode
 elpa
 elpy
@@ -154,6 +156,7 @@ isearch
 ispell
 javascript
 jedi
+JIT
 jpeg
 js
 jsbeautifier

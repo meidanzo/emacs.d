@@ -19,6 +19,28 @@
 
 ;;; C/C++: cc-mode
 
+;; Defined by find-file.el (a defcustom); the declaration silences the
+;; byte compiler for the reference inside `with-eval-after-load'.
+(defvar cc-search-directories)
+
+;; Directories searched by `ff-find-other-file' for headers.  Added to the
+;; default list once find-file.el loads, not from the per-buffer hook below
+;; and not with a plain `setq': init-CIDE.el appends its own directories the
+;; same way, and a `setq' here would wipe them whenever this file happened
+;; to load after find-file.el.
+(with-eval-after-load 'find-file
+  (dolist (directory '("../*/include" "$WXWIN/include"))
+    (add-to-list 'cc-search-directories directory t)))
+
+;; Defined by cc-mode.el, which loads on the first classic C/C++ buffer;
+;; the declarations silence the byte compiler for the functions below.
+;; `c-toggle-auto-hungry-state' itself is defined in cc-cmds.el, which
+;; cc-mode.el requires (check-declare finds it there, not in cc-mode.el).
+(defvar c-auto-newline)
+(defvar c-electric-pound-behavior)
+(defvar c-basic-offset)
+(declare-function c-toggle-auto-hungry-state "cc-cmds")
+
 (defun my-common-cc-mode-setup ()
   "Setup shared by all languages (java/groovy/c++ ...)."
   ;; Make DEL take all previous whitespace with it.
@@ -28,10 +50,6 @@
 
 (defun my-c-mode-setup ()
   "C/C++ only setup."
-  ;; Directories searched by `ff-find-other-file' for headers.
-  (setq cc-search-directories
-        '("." "/usr/include" "/usr/local/include/*" "../*/include" "$WXWIN/include"))
-
   ;; Browse Emacs' C code.
   (push '(nil "^DEFUN *(\"\\([a-zA-Z0-9-]+\\)" 1) imenu-generic-expression)
 
@@ -65,7 +83,7 @@
 
 (defun my-cmake-mode-imenu-setup ()
   "Imenu setup for `cmake-mode' and `cmake-ts-mode'.
-cmake-ts-mode has no built-in imenu rules, so the same regex-based
+`cmake-ts-mode' has no built-in imenu rules, so the same regex-based
 index is installed for both modes.  Use `setq-local' so the value
 stays in the buffer instead of clobbering the global default."
   (setq-local imenu-generic-expression

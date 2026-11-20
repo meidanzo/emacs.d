@@ -5,9 +5,9 @@
 ;; Three jobs, in one place:
 ;;   1. Tell Emacs where grammar shared libraries live.
 ;;   2. Maintain grammar recipes and auto-install missing ones once Emacs
-;;      has started and gone idle (interactive sessions only; C/C++,
-;;      Python, and Rust grammars require their matching language server,
-;;      while the CMake grammar is independent).  Building a grammar
+;;      has started and gone idle (interactive sessions only; every
+;;      grammar is installed only when its matching language server
+;;      exists).  Building a grammar
 ;;      clones a repository and compiles C, so it runs in a background
 ;;      Emacs process and never freezes the session.
 ;;   3. Switch c/c++/python/rust buffers to their tree-sitter modes via
@@ -133,6 +133,21 @@ once the process has finished.  Nil installs in the foreground."
        (fboundp 'treesit-language-available-p)
        (treesit-language-available-p lang)))
 
+(defun my-treesit--install-language-grammar (language)
+  "Install LANGUAGE's grammar into `my-treesit-grammar-directory'.
+Emacs 30's `treesit-install-language-grammar' accepts an output
+directory; Emacs 29's accepts only LANGUAGE and always installs under
+`user-emacs-directory'.  Call the internal installer behind it on
+Emacs 29 so a customized `my-treesit-grammar-directory' still works."
+  (let ((recipe (cdr (assq language treesit-language-source-alist))))
+    (if (>= (cdr (func-arity #'treesit-install-language-grammar)) 2)
+        (treesit-install-language-grammar language
+                                          my-treesit-grammar-directory)
+      (unless recipe
+        (error "No tree-sitter recipe for %s" language))
+      (apply #'treesit--install-language-grammar-1
+             my-treesit-grammar-directory language recipe))))
+
 (defun my-treesit-ensure-grammar (lang &optional force)
   "Install LANG's grammar from `my-treesit-language-specs' when missing.
 With FORCE, install it even when a library is already present.  This runs
@@ -141,7 +156,7 @@ is `my-treesit-ensure-grammars'."
   (when (or force (not (my-treesit-grammar-available-p lang)))
     (condition-case err
         (progn
-          (treesit-install-language-grammar lang my-treesit-grammar-directory)
+          (my-treesit--install-language-grammar lang)
           (unless (my-treesit-grammar-available-p lang)
             (message "%s tree-sitter grammar still unavailable after install."
                      lang)))
@@ -162,7 +177,7 @@ With FORCE, every language whose guard succeeds, installed or not."
     (nreverse languages)))
 
 (defun my-treesit--install-form (languages)
-  "Return the form a background Emacs evaluates to install LANGUAGES.
+  "Return the form for a background Emacs to install LANGUAGES.
 The process exits 0 when no error escapes the form.  Do not use the exit
 status to decide success: `treesit-install-language-grammar' reports most
 failures as warnings instead of signalling them (Emacs 29 and later), so
@@ -173,11 +188,21 @@ checks whether each grammar actually loads afterwards."
      ;; dynamically.
      (require 'treesit)
      (setq treesit-language-source-alist ',treesit-language-source-alist)
-     (let ((failed nil))
+     (let ((out-dir ,my-treesit-grammar-directory)
+           (failed nil))
        (dolist (language ',languages)
          (condition-case err
-             (treesit-install-language-grammar language
-                                               ,my-treesit-grammar-directory)
+             ;; Emacs 29's public installer has no output-directory
+             ;; argument; the internal function it calls does, with the
+             ;; same signature in Emacs 29 and 30.
+             (if (>= (cdr (func-arity #'treesit-install-language-grammar)) 2)
+                 (treesit-install-language-grammar language out-dir)
+               (let ((recipe (cdr (assq language
+                                        treesit-language-source-alist))))
+                 (unless recipe
+                   (error "No tree-sitter recipe for %s" language))
+                 (apply #'treesit--install-language-grammar-1
+                        out-dir language recipe)))
            (error (push language failed)
                   (message "my-treesit: %s failed: %s"
                            language (error-message-string err)))))

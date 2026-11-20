@@ -116,7 +116,7 @@ With `auto', choose a backend from the project files."
   :group 'my-cpp)
 
 (defcustom my-cpp-qmake-program "qmake"
-  "qmake executable used to configure .pro projects.
+  "The qmake executable used to configure .pro projects.
 Set to qmake-qt6 or an absolute path when several Qt versions are
 installed and the default resolves to the wrong one."
   :type 'string
@@ -134,7 +134,8 @@ installed and the default resolves to the wrong one."
 
 (defcustom my-cpp-parallel-jobs nil
   "Maximum concurrent jobs for parallel build commands, or nil.
-nil means the processor count (`nproc').  The count is always passed
+nil means the processor count (`nproc'), capped by the available memory
+\\(see `my-cpp-memory-per-job-mb').  The count is always passed
 explicitly: `--parallel N' for the CMake backend, `-j N' for the Make,
 qmake, and Autotools backends.  An omitted count is unsafe either way:
 `cmake --build --parallel' without one hands GNU Make a bare `-j', which
@@ -142,20 +143,61 @@ runs an UNLIMITED number of concurrent compilations; a bare `make' stays
 serial.  Unlimited `-j' on a project the size of albert launches dozens
 of g++ processes at once and exhausts RAM (observed: a full freeze of
 this machine).  Set an explicit number here, or per-project in
-.dir-locals.el, to bound the memory used."
+.dir-locals.el, to bound the memory used.  A non-positive value falls
+back to the automatic count: 0 is truthy in Emacs Lisp and would reach
+the build tools, where `-j 0' means unlimited jobs."
   :type '(choice (const :tag "Processor count" nil)
                  (integer :tag "Explicit job count"))
   :group 'my-cpp)
 
+(defcustom my-cpp-memory-per-job-mb 1500
+  "Assumed peak memory of one compile job in MiB, or nil to ignore memory.
+Only used when `my-cpp-parallel-jobs' is nil: the default job count is then
+the smaller of the processor count and the available memory divided by this
+figure.  A processor count alone still overcommits a many-core machine with
+little RAM when every job is a heavy C++ translation unit (Qt, Boost).
+Raise it for template-heavy projects, lower it for plain C."
+  :type '(choice (const :tag "Ignore memory" nil)
+                 (integer :tag "MiB per job"))
+  :group 'my-cpp)
+
+(defun my-cpp--available-memory-mb ()
+  "Return the memory available for new processes in MiB, or nil if unknown.
+Reads MemAvailable from /proc/meminfo of the local machine.  nil for a
+remote `default-directory': the file name would still resolve locally
+while `nproc' runs on the remote host, so a cap mixing the two hosts
+would be wrong."
+  (ignore-errors
+    (unless (file-remote-p default-directory)
+      (let ((file "/proc/meminfo"))
+        (when (file-readable-p file)
+          (with-temp-buffer
+            (insert-file-contents file)
+            (when (re-search-forward
+                   "^MemAvailable:[ \t]+\\([0-9]+\\)[ \t]+kB" nil t)
+              (/ (string-to-number (match-string 1)) 1024))))))))
+
 (defun my-cpp-effective-parallel-jobs ()
   "Return the job count for parallel builds.
-The explicit `my-cpp-parallel-jobs' wins; otherwise ask `nproc' and never
-fall below 1."
-  (or my-cpp-parallel-jobs
-      (max 1 (string-to-number
-              (or (with-demoted-errors "nproc failed: %S"
-                    (shell-command-to-string "nproc"))
-                  "")))))
+A positive `my-cpp-parallel-jobs' wins; otherwise ask `nproc', cap the
+result by available memory (see `my-cpp-memory-per-job-mb') and never
+fall below 1.  A non-positive explicit value falls back to the automatic
+count: 0 is truthy in Emacs Lisp and would reach the build tools, where
+`-j 0' means unlimited jobs."
+  (or (and (integerp my-cpp-parallel-jobs)
+           (> my-cpp-parallel-jobs 0)
+           my-cpp-parallel-jobs)
+      (let ((processors
+             (max 1 (string-to-number
+                     (or (with-demoted-errors "nproc failed: %S"
+                           (shell-command-to-string "nproc"))
+                         ""))))
+            (memory (and (integerp my-cpp-memory-per-job-mb)
+                         (> my-cpp-memory-per-job-mb 0)
+                         (my-cpp--available-memory-mb))))
+        (if memory
+            (max 1 (min processors (/ memory my-cpp-memory-per-job-mb)))
+          processors))))
 
 (defcustom my-cpp-cmake-configure-options nil
   "Extra CMake configure arguments, such as a toolchain file or generator.
@@ -223,8 +265,8 @@ This is passed to the selected GDB or LLDB command."
 ;; names).  These helpers find them instead.
 (defun my-cpp-qmake-project-file (directory)
   "Return the .pro project file directly in DIRECTORY, or nil.
-With several .pro files, the first in alphabetical order wins
-(`directory-files' sorts when called without a NOSORT argument).
+With several .pro files, the first in alphabetical order wins;
+`directory-files' sorts when called without a NOSORT argument.
 Errors (an unreadable ancestor) mean \"no .pro file here\" because this
 also runs on the `project-current' path."
   (car (ignore-errors (directory-files directory t "\\.pro\\'"))))
@@ -294,8 +336,38 @@ round trip."
     (when-let* ((root (my-cpp--nearest-marker-root directory)))
       (cons 'transient root))))
 
+;; Defined by project.el; the declaration silences the byte compiler for
+;; the reference inside `with-eval-after-load' (this file does not
+;; require project).
+(defvar project-find-functions)
+
 (with-eval-after-load 'project
-  (add-hook 'project-find-functions #'my-cpp-project-try-local t))
+  ;; Move it before the built-in `project-try-vc': when its ancestor walk
+  ;; signals (an unreadable parent directory, say) Emacs 30 aborts the
+  ;; whole `project-find-functions' chain and every find function after
+  ;; it would never run.  This function self-skips version-controlled
+  ;; directories, so the VC root still wins there.  Inserting just before
+  ;; `project-try-vc' also keeps the load-order of the three language
+  ;; find functions (python, C/C++, Rust), so overlapping markers keep
+  ;; their old winner.
+  ;; A plain `setq', not `add-hook': its third argument has meant DEPTH
+  ;; since Emacs 28, and the legacy APPEND value t would reorder the
+  ;; list against add-hook's depth bookkeeping.
+  (let* ((functions project-find-functions)
+         (rest (memq 'project-try-vc functions))
+         (head (if rest (take (- (length functions) (length rest))
+                              functions)
+                 functions)))
+    ;; A config reload re-runs this block; a previous run already put
+    ;; the function in place.
+    (unless (memq 'my-cpp-project-try-local head)
+      (let* ((base (delq 'my-cpp-project-try-local functions))
+             (tail (memq 'project-try-vc base))
+             (n (if tail (- (length base) (length tail)) (length base))))
+        (setq project-find-functions
+              (append (take n base)
+                      (list 'my-cpp-project-try-local)
+                      (nthcdr n base)))))))
 
 (defun my-cpp-vc-root ()
   "Return the version-control root of `default-directory', or nil.
@@ -454,7 +526,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
      root)))
 
 (defun my-cpp-after-cmake-configure (root build-directory)
-  "Link and inspect the compilation database after CMake succeeds."
+  "Link and check BUILD-DIRECTORY's compilation database at ROOT."
   (my-cpp-link-compilation-database root build-directory)
   (my-cpp-check-compilation-database root))
 
@@ -537,7 +609,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
      root)))
 
 (defun my-cpp-after-meson-setup (root build-directory)
-  "Expose Meson's compilation database after setup succeeds."
+  "Expose BUILD-DIRECTORY's compilation database at ROOT after Meson setup."
   (my-cpp-link-compilation-database
    root (expand-file-name "compile_commands.json" build-directory))
   (my-cpp-check-compilation-database root))
@@ -574,7 +646,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
      (format "meson compile -C %s" (shell-quote-argument build-directory)))))
 
 (defun my-cpp-meson-test ()
-  "Run Meson's tests in the selected build directory."
+  "Run Meson's test suite in the selected build directory."
   (interactive)
   (let ((build-directory (my-cpp-meson-build-directory)))
     (my-cpp-compile-at
@@ -591,7 +663,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
   (my-cpp-check-compilation-database root))
 
 (defun my-cpp-after-xmake-configure (root)
-  "Generate xmake's compilation database after configuring the project."
+  "Generate xmake's compilation database under ROOT after configuring."
   (make-directory (expand-file-name ".vscode" root) t)
   ;; `xmake project' takes the output directory as a positional argument;
   ;; it has no `-o' option (it rejects one with \"Invalid option: -o\").
@@ -622,7 +694,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
   (my-cpp-compile-at (my-cpp-project-root) "xmake"))
 
 (defun my-cpp-xmake-test ()
-  "Run tests defined by the current xmake project."
+  "Run the test targets defined by the current xmake project."
   (interactive)
   (my-cpp-compile-at (my-cpp-project-root) "xmake test"))
 
@@ -633,7 +705,7 @@ The result is always an expanded path (see `my-cpp-project-root')."
   (expand-file-name my-cpp-build-directory (my-cpp-project-root)))
 
 (defun my-cpp-autotools-configure ()
-  "Run an Autotools project's bootstrap and configure steps.
+  "Run an Autotools project's bootstrap and configure phase.
 Without a generated configure script, bootstrap with `autogen.sh' when the
 project has one (run with NOCONFIGURE=1 so it does not configure inside the
 source tree, which would make the out-of-source build below refuse to
@@ -703,6 +775,7 @@ run), or else with `autoreconf -fi'."
 
 (defun my-cpp-ninja-build-directory (&optional choose)
   "Find a Ninja build directory, prompting if it is ambiguous or absent.
+With CHOOSE non-nil, always prompt, even when only one candidate exists.
 The result is always an expanded path (see `my-cpp-project-root')."
   (let* ((root (file-name-as-directory (my-cpp-project-root)))
          (candidates
@@ -826,12 +899,12 @@ builds in-source like a Make project."
         (_ (call-interactively #'my-cpp-run-test-command))))))
 
 (defun my-cpp-run-build-command (command)
-  "Run a project-specific build command in the project root."
+  "Run COMMAND as the project's build command in the project root."
   (interactive (list (read-string "Build command: " compile-command)))
   (my-cpp-compile-at (my-cpp-project-root) command))
 
 (defun my-cpp-run-test-command (command)
-  "Run a project-specific test command in the project root."
+  "Run COMMAND as the project's test command in the project root."
   (interactive (list (read-string "Test command: ")))
   (my-cpp-compile-at (my-cpp-project-root) command))
 
@@ -894,7 +967,7 @@ bounded defaults."
 
 (defun my-cpp-capture-compilation-database (command)
   "Generate or capture compile_commands.json for the current project.
-Use native database export for CMake, Meson, and xmake. COMMAND is used with
+Use native database export for CMake, Meson, and xmake.  COMMAND is used with
 Bear for Autotools, Make, Ninja, qmake, and generic build commands.  A
 programmatic call without COMMAND on a Bear-only build system uses the
 default capture command instead of failing."
@@ -1009,7 +1082,9 @@ so the keys are normalized to symbols here; callers use one form."
         (insert "BasedOnStyle: Google\n"
                 "IndentWidth: 4\n"
                 "ContinuationIndentWidth: 4\n"
-                "UseTab: Never\n"))
+                "UseTab: Never\n"
+                ;; Google's -1 only suits two-space indentation.
+                "AccessModifierOffset: -2\n"))
       (message "Wrote %s" file))))
 
 ;;; Debugging
@@ -1075,6 +1150,10 @@ apply to the next server without re-evaluating this file."
           (when my-cpp-clangd-query-drivers
             (list (concat "--query-driver="
                           (string-join my-cpp-clangd-query-drivers ","))))))
+
+;; Defined by eglot.el; the declarations silence the byte compiler.
+(defvar eglot-server-programs)
+(declare-function eglot-alternatives "eglot")
 
 (with-eval-after-load 'eglot
   ;; Keep CMake language-server discovery explicit so this also works on
@@ -1185,14 +1264,21 @@ Skips temporary buffers, like `my-cpp-eglot-ensure'."
               (file-name-directory buffer-file-name)
               ".clang-format"))
         "--style=file"
-      "--style={BasedOnStyle: Google, IndentWidth: 4, ContinuationIndentWidth: 4, UseTab: Never}"))
+      "--style={BasedOnStyle: Google, IndentWidth: 4, ContinuationIndentWidth: 4, UseTab: Never, AccessModifierOffset: -2}"))
   "Apheleia formatter command for C/C++ buffers.
 The project's .clang-format wins; without one, fall back to Google style
 with four-space indentation, matching `c-basic-offset' and
-`c-ts-mode-indent-offset'.")
+`c-ts-mode-indent-offset'.  Google style sets AccessModifierOffset to -1,
+which is right for two-space indentation only: with IndentWidth 4 it puts
+`public:' at column 3.  -2 puts it at column 2, where `google-set-c-style'
+\\(access-label offset `/', minus half of `c-basic-offset') puts it too.")
 
 ;; Skipping Apheleia on idle auto-saves is handled for every language
 ;; layer by `my-apheleia-skip-auto-save' in init-ide.el.
+
+;; Defined by apheleia.el; the declarations silence the byte compiler.
+(defvar apheleia-formatters)
+(defvar apheleia-mode-alist)
 
 (with-eval-after-load 'apheleia
   (setf (alist-get 'my-cpp-clang-format apheleia-formatters)
@@ -1207,7 +1293,7 @@ bound by init-ide.el."
   (interactive)
   (if (fboundp 'apheleia-format-buffer)
       (call-interactively #'apheleia-format-buffer)
-    (user-error "apheleia is not available; cannot format the buffer")))
+    (user-error "Apheleia is not available; cannot format the buffer")))
 
 ;;; Static analysis
 
@@ -1248,6 +1334,45 @@ guessed from the buffer.  The build directory is skipped either way."
                        "../include/*" "../*/include" "../*/src"))
     (add-to-list 'cc-search-directories directory t)))
 
+(defcustom my-cpp-switch-source-header-timeout 5
+  "Seconds `my-cpp-switch-source-header' waits for clangd before falling back.
+nil means no separate limit: the JSON-RPC default applies (60s, set by
+init-ide.el).  Only positive values are honored; jsonrpc treats 0 as an
+immediate timeout."
+  :type '(choice (const :tag "Use the JSON-RPC default" nil)
+                 (integer :tag "Seconds"))
+  :group 'my-cpp)
+
+(defun my-cpp--switch-source-header-timeout ()
+  "Return the effective timeout for `my-cpp-switch-source-header'.
+Non-positive values of `my-cpp-switch-source-header-timeout' are treated
+as nil (the JSON-RPC default)."
+  (and (numberp my-cpp-switch-source-header-timeout)
+       (> my-cpp-switch-source-header-timeout 0)
+       my-cpp-switch-source-header-timeout))
+
+;; Eglot made these two public in Emacs 30 (Eglot 1.17); Emacs 29 only has
+;; the double-dash names.  Without the fallback the clangd request would
+;; fail silently inside `ignore-errors' and every switch would go through
+;; `ff-find-other-file'.
+(declare-function eglot-path-to-uri "eglot")
+(declare-function eglot-uri-to-path "eglot")
+(declare-function eglot--path-to-uri "eglot")
+(declare-function eglot--uri-to-path "eglot")
+(declare-function jsonrpc-request "jsonrpc")
+
+(defun my-cpp--path-to-uri (path)
+  "Return the file URI Eglot would send for PATH."
+  (if (fboundp 'eglot-path-to-uri)
+      (eglot-path-to-uri path)
+    (eglot--path-to-uri path)))
+
+(defun my-cpp--uri-to-path (uri)
+  "Return the file name for URI as Eglot would read it."
+  (if (fboundp 'eglot-uri-to-path)
+      (eglot-uri-to-path uri)
+    (eglot--uri-to-path uri)))
+
 (defun my-cpp-switch-source-header ()
   "Visit the header or source counterpart of the current file.
 Ask clangd (clangd's textDocument/switchSourceHeader request): it knows
@@ -1256,16 +1381,23 @@ sources apart.  Fall back to `ff-find-other-file' when no server is
 running, the request fails, or clangd finds nothing.  With a prefix
 argument, open the result in another window."
   (interactive)
-  (let ((other (when (and buffer-file-name
-                          (fboundp 'eglot-current-server)
-                          (eglot-current-server))
-                 (ignore-errors
-                   (jsonrpc-request
-                    (eglot-current-server)
-                    :textDocument/switchSourceHeader
-                    (list :uri (eglot-path-to-uri buffer-file-name)))))))
+  (let* ((server (and buffer-file-name
+                      (fboundp 'eglot-current-server)
+                      (eglot-current-server)))
+         ;; This request blocks Emacs while it waits.  The global
+         ;; `jsonrpc-default-request-timeout' (init-ide.el) is generous for
+         ;; first completions on huge workspaces; a header/source switch
+         ;; should not freeze the UI that long while clangd is still
+         ;; indexing, so give up after a few seconds and use the fallback.
+         (other (when server
+                  (ignore-errors
+                    (jsonrpc-request
+                     server
+                     :textDocument/switchSourceHeader
+                     (list :uri (my-cpp--path-to-uri buffer-file-name))
+                     :timeout (my-cpp--switch-source-header-timeout))))))
     (if (and (stringp other) (not (string-empty-p other)))
-        (let ((target (eglot-uri-to-path other)))
+        (let ((target (my-cpp--uri-to-path other)))
           (if current-prefix-arg
               (find-file-other-window target)
             (find-file target)))
@@ -1274,7 +1406,7 @@ argument, open the result in another window."
 ;;; Existing buffers
 
 (defun my-cpp-configure-existing-buffers ()
-  "Apply C/C++ setup to buffers that already exist when this file loads."
+  "Apply C/C++ setup to buffers that already exist when this file is loaded."
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
       (when (and buffer-file-name
@@ -1324,7 +1456,7 @@ argument, open the result in another window."
   '(c-mode-map c++-mode-map objc-mode-map
     c-ts-mode-map c++-ts-mode-map
     cmake-mode-map cmake-ts-mode-map)
-  "Mode maps where the C/C++-specific ',' 't' keys are active.")
+  "Mode maps where the C/C++-specific ,t keys are active.")
 
 ;; The mode maps exist only after their libraries load (all built in).
 ;; c-ts-mode.el (which also provides c++-ts-mode) and cmake-ts-mode.el
@@ -1332,43 +1464,63 @@ argument, open the result in another window."
 ;; grammar is missing, so they load only once their grammars exist; on
 ;; a fresh install the background install (init-tree-sitter.el) runs the
 ;; loader again from `my-treesit-grammars-ready-hook'.
-(ignore-errors (require 'cmake-mode))
+;; cmake-mode (shipped with CMake) is not required here: its keys are bound
+;; from `with-eval-after-load' below, when the first CMake buffer loads it,
+;; so no session pays for it at startup.
 
 (defun my-cpp-load-ts-modes ()
   "Load the built-in C/C++ and CMake tree-sitter modes when ready.
 Only loads a mode file when its grammars are installed, because the
-Emacs 30 core files warn when loaded without them."
-  (when (and (my-treesit-grammar-available-p 'c)
-             (my-treesit-grammar-available-p 'cpp))
-    (ignore-errors (require 'c-ts-mode)))
-  (when (my-treesit-grammar-available-p 'cmake)
-    (ignore-errors (require 'cmake-ts-mode))))
+Emacs 30 core files warn when loaded without them.  Does nothing when
+init-tree-sitter.el has not been loaded."
+  (when (fboundp 'my-treesit-grammar-available-p)
+    (when (and (my-treesit-grammar-available-p 'c)
+               (my-treesit-grammar-available-p 'cpp))
+      (ignore-errors (require 'c-ts-mode)))
+    (when (my-treesit-grammar-available-p 'cmake)
+      (ignore-errors (require 'cmake-ts-mode)))))
 
 (my-cpp-load-ts-modes)
 (add-hook 'my-treesit-grammars-ready-hook #'my-cpp-load-ts-modes)
 
 (defmacro my-cpp-bind-t-keys ()
-  "Bind the C/C++ `,' `t' keys in every mode map that exists yet.
-A tree-sitter mode map exists only after its file loads, which happens
-once the grammar is installed, so the keys are bound again from each
-mode file's `with-eval-after-load' hook."
-  '(my-comma-leader-def
-    :keymaps (seq-filter #'boundp my-cpp-keymaps)
-    "tc" #'my-cpp-configure
-    "tb" #'my-cpp-run-build-command
-    "te" #'my-cpp-run-test-command
-    "td" #'my-cpp-cmake-debug-test
-    "tj" #'my-cpp-capture-compilation-database
-    "tv" #'my-cpp-check-compilation-database
-    "th" #'my-cpp-switch-source-header
-    "tw" #'my-cpp-write-clang-format))
+  "Bind the C/C++ ,t keys in every mode map that exists yet.
+A mode map exists only after its file loads, which happens once the
+grammar is installed or the first C/C++ buffer opens, so the keys are
+bound again from each mode file's `with-eval-after-load' hook.  Does
+nothing while no mode map exists: an empty `:keymaps' would make
+`general-def' bind into the global evil map."
+  '(let ((maps (seq-filter #'boundp my-cpp-keymaps)))
+     (when maps
+       ;; Expand at run time: `my-comma-leader-def' is a macro without
+       ;; a function cell, so a file compiled without init-evil loaded
+       ;; would turn a direct call into a broken function call.
+       (eval (macroexpand
+              `(my-comma-leader-def
+                :keymaps ',maps
+                "tc" #'my-cpp-configure
+                "tb" #'my-cpp-run-build-command
+                "te" #'my-cpp-run-test-command
+                "td" #'my-cpp-cmake-debug-test
+                "tj" #'my-cpp-capture-compilation-database
+                "tv" #'my-cpp-check-compilation-database
+                "th" #'my-cpp-switch-source-header
+                "tw" #'my-cpp-write-clang-format))))))
 
 ;; Wait for init-evil rather than for evil itself (like init-python.el):
 ;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
 ;; loading inside it, before the definer exists.
 (with-eval-after-load 'init-evil (my-cpp-bind-t-keys))
-(with-eval-after-load 'c-ts-mode (my-cpp-bind-t-keys))
-(with-eval-after-load 'cmake-ts-mode (my-cpp-bind-t-keys))
+;; cc-mode itself is not loaded during init (init-cc-mode.el only adds
+;; hooks), so the classic mode maps may still be void when the hook
+;; above runs and the binder does nothing.  Rebind when cc-mode finally
+;; autoloads (the first classic C/C++ buffer), like the tree-sitter and
+;; CMake mode files.  A mode file can load before init-evil has defined
+;; the definer (`c-ts-mode' loads right here when its grammars exist),
+;; so each of these waits for init-evil as well.
+(dolist (feature '(cc-mode c-ts-mode cmake-mode cmake-ts-mode))
+  (with-eval-after-load feature
+    (with-eval-after-load 'init-evil (my-cpp-bind-t-keys))))
 
 (my-cpp-configure-existing-buffers)
 

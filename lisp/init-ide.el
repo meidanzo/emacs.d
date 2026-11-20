@@ -40,7 +40,8 @@
 ;;   1. Operation registry     the dispatch table behind set C
 ;;   2. Shared commands        my-ide-build/test/debug/lint/format
 ;;   3. Shared Eglot setup     language-neutral LSP behavior
-;;   4. Keybindings            "," + "n" shared keys
+;;   4. Self-check             M-x my-ide-doctor
+;;   5. Keybindings            "," + "n" shared keys
 ;;; Code:
 
 (require 'subr-x)
@@ -96,7 +97,7 @@ Used by the interactive shared commands below."
   (my-ide-run-operation 'build))
 
 (defun my-ide-test ()
-  "Run the current project's tests with its language's test command."
+  "Run the current project's test suite with its language's test command."
   (interactive)
   (my-ide-run-operation 'test))
 
@@ -129,19 +130,29 @@ only while diagnosing a server problem."
   :type 'boolean
   :group 'tools)
 
+;; The option has been `jsonrpc-default-request-timeout' since Emacs
+;; 28.1 and this configuration requires 29.1, so no fallback name is
+;; needed.  The declarations silence the byte compiler; the variables
+;; themselves are defined when eglot loads jsonrpc.
+(defvar jsonrpc-default-request-timeout)
+(defvar eglot-autoshutdown)
+(defvar eglot-extend-to-xref)
+
+(defun my-ide-eglot-set-request-timeout (seconds)
+  "Set the JSON-RPC request timeout used by Eglot to SECONDS.
+A fresh language-server session on a large workspace can need more
+than the 10s default for its first completion or xref answer
+\\(rust-analyzer on yazi, clangd on a big Qt project); the request
+then fails with a misleading \"Timed out\" error, so set it
+generously."
+  (setq jsonrpc-default-request-timeout seconds))
+
 (with-eval-after-load 'eglot
   (setq eglot-autoshutdown t)
 
-  ;; A fresh language-server session on a large workspace can need more
-  ;; than Emacs' 10s request timeout for its first completion or xref
-  ;; answer (rust-analyzer on yazi, clangd on a big Qt project); the
-  ;; request then fails with a misleading "Timed out" error.  Verified
-  ;; on real projects: rust-analyzer's first completion in the yazi
-  ;; workspace exceeded the default.  Emacs 30 renamed the option; keep
-  ;; the Emacs 29 name working too.
-  (if (boundp 'jsonrpc-default-request-timeout)
-      (setq jsonrpc-default-request-timeout 60)
-    (setq jsonrpc-default-request-timeout 60))
+  ;; Verified on real projects: rust-analyzer's first completion in the
+  ;; yazi workspace exceeded Emacs' 10s default timeout.
+  (my-ide-eglot-set-request-timeout 60)
 
   ;; Jumping to a definition outside the project (a system header, say)
   ;; opens a file the project's server does not own.  Without this, the
@@ -169,13 +180,27 @@ only while diagnosing a server problem."
   (cl-defmethod xref-backend-identifier-at-point ((_backend (eql eglot)))
     (or (thing-at-point 'symbol) ""))
 
-  ;; Inlay hints (deduced types, parameter names) from the server.  The
-  ;; mode turns itself off when the server lacks :inlayHintProvider.
+  ;; Inlay hints (deduced types, parameter names) from the server.
+  (add-hook 'eglot-managed-mode-hook #'my-ide-eglot-inlay-hints))
+
+(defun my-ide-eglot-inlay-hints ()
+  "Show inlay hints while Eglot manages the buffer, hide them afterwards.
+On Emacs 30 `eglot-managed-mode-hook' runs when Eglot starts and when it
+stops managing a buffer; on Emacs 29 it only runs on start, where Eglot
+itself turns the mode off again.  Hooking `eglot-inlay-hints-mode'
+directly would also call it on stop, where no server is left to ask for
+:inlayHintProvider (the mode then signals instead of turning itself off)
+and the hint overlays stay behind.  The mode still turns itself off when
+the server lacks the capability."
   (when (fboundp 'eglot-inlay-hints-mode)
-    (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)))
+    (cond
+     ((and (fboundp 'eglot-managed-p) (eglot-managed-p))
+      (eglot-inlay-hints-mode 1))
+     ((bound-and-true-p eglot-inlay-hints-mode)
+      (eglot-inlay-hints-mode -1)))))
 
 (defun my-ide-eglot-capf-first ()
-  "Put the server's completion-at-point function before fallback sources.
+  "Put the server's `completion-at-point' function before fallback sources.
 `eglot-managed-mode-hook' runs both when Eglot starts and when it stops
 managing a buffer.  Do nothing on stop: Eglot has just removed its
 function and re-adding it would leave a dead capf behind."
@@ -275,7 +300,8 @@ A second registration for the same MODES replaces the first."
 ;; neutral (every layer formats through apheleia), so it lives here
 ;; rather than in one language layer.
 (defun my-apheleia-skip-auto-save (orig-fun &rest args)
-  "Skip apheleia formatting when the save came from idle auto-save."
+  "Call ORIG-FUN with ARGS unless the save came from idle auto-save.
+Skip apheleia formatting in that case."
   (if (and (current-idle-time)
            (> (float-time (current-idle-time)) 0.05))
       nil
@@ -296,6 +322,168 @@ A second registration for the same MODES replaces the first."
        'my-ide
        "Cannot find Apheleia's after-save function; idle auto-saves will reformat the buffer"))))
 
+;;; Self-check
+
+;; `M-x my-ide-doctor' (or `emacs --batch -l init.el -f my-ide-doctor')
+;; reports whether this configuration is wired up on the current machine:
+;; tree-sitter grammars, language servers and tools, the packages the
+;; layers rely on, the shared-operation registry and the Eglot entries.
+;; Missing optional programs are warnings; broken wiring is a failure.
+
+;; Defined by eglot.el; the declaration silences the byte compiler for
+;; the reference below.
+(defvar eglot-server-programs)
+
+(defun my-ide-doctor-report ()
+  "Return rows (STATUS TOPIC MESSAGE) describing this IDE setup.
+STATUS is `ok', `warn' (an optional piece is missing) or `fail' (the
+configuration itself is not wired up)."
+  (let (rows)
+    (cl-flet* ((row (status topic format-string &rest args)
+                 (push (list status topic (apply #'format format-string args))
+                       rows))
+               (tool (topic label path hint)
+                 (row (if path 'ok 'warn) topic "%s: %s" label (or path hint))))
+      ;; Emacs and tree-sitter.
+      (row (if (version<= "29.1" emacs-version) 'ok 'fail)
+           "emacs" "Emacs %s" emacs-version)
+      (let ((ts (and (fboundp 'treesit-available-p) (treesit-available-p))))
+        (if ts
+            (row 'ok "tree-sitter" "available, runtime ABI %s"
+                 (if (fboundp 'treesit-library-abi-version)
+                     (treesit-library-abi-version)
+                   "unknown"))
+          (row 'warn "tree-sitter" "this Emacs has no tree-sitter support"))
+        (when (and ts (fboundp 'treesit-language-available-p))
+          (dolist (lang '(c cpp cmake python rust))
+            (if (treesit-language-available-p lang)
+                (row 'ok "grammar" "%s installed" lang)
+              (row 'warn "grammar" "%s missing: %s" lang
+                   (if (and (fboundp 'my-treesit--languages-to-install)
+                            (memq lang (my-treesit--languages-to-install)))
+                       "run M-x my-treesit-ensure-grammars"
+                     "its language server is missing, so it is not auto-installed"))))))
+      ;; Language servers.
+      (tool "c/c++" "clangd"
+            (executable-find (or (bound-and-true-p my-cpp-clangd-program)
+                                 "clangd"))
+            "not found, no C/C++ LSP")
+      (tool "cmake" "language server"
+            (and (fboundp 'my-cmake-langserver-exist) (my-cmake-langserver-exist))
+            "not found (neocmakelsp or cmake-language-server)")
+      (tool "rust" "rust-analyzer" (executable-find "rust-analyzer")
+            "not found, no Rust LSP")
+      (tool "python" "language server"
+            (and (fboundp 'my-python-langserver-exist) (my-python-langserver-exist))
+            "not found (basedpyright, pyrefly, pyright or pylsp)")
+      ;; Other programs the layers call.
+      (let (found missing)
+        (dolist (program '("clang-format" "cppcheck" "gdb" "cmake" "make" "bear"
+                           "cargo" "rustfmt" "ruff" "uv" "git" "cc" "c++"))
+          (if (executable-find program)
+              (push program found)
+            (push program missing)))
+        (row (if missing 'warn 'ok) "tools" "missing: %s; found: %s"
+             (if missing (mapconcat #'identity (reverse missing) " ") "none")
+             (if found (mapconcat #'identity (reverse found) " ") "none")))
+      ;; Packages.
+      (let ((missing (seq-remove
+                      (lambda (feature)
+                        (or (featurep feature)
+                            (locate-library (symbol-name feature))))
+                      '(company flycheck apheleia treesit-auto pyvenv
+                        google-c-style rust-mode cmake-mode general evil eglot))))
+        (if missing
+            (row 'warn "packages" "not installed: %s"
+                 (mapconcat #'symbol-name missing ", "))
+          (row 'ok "packages" "all present")))
+      ;; The shared-operation registry, per major mode.
+      (dolist (mode '(c-mode c++-ts-mode objc-mode python-mode python-ts-mode
+                      rust-mode rust-ts-mode cmake-mode cmake-ts-mode))
+        (let* ((operations (if (memq mode '(cmake-mode cmake-ts-mode))
+                               '(build test debug lint)
+                             '(build test debug lint format)))
+               (missing (with-temp-buffer
+                          (setq-local major-mode mode)
+                          (seq-remove #'my-ide-operation-command operations))))
+          (row (if missing 'fail 'ok) "operations" "%s: %s" mode
+               (if missing
+                   (format "not registered: %s" missing)
+                 (mapconcat #'symbol-name operations " ")))))
+      ;; Eglot entries installed by the layers.
+      (when (require 'eglot nil t)
+        ;; Each check is (TOPIC MODES CONTACT): CONTACT is the function the
+        ;; layer installs, or nil when any entry for MODES will do.
+        (dolist (check (list
+                        (list "c/c++" (bound-and-true-p my-cpp-modes)
+                              'my-cpp-clangd-contact)
+                        (list "rust" (bound-and-true-p my-rust-modes)
+                              'my-rust-analyzer-contact)
+                        (list "python" '(python-mode python-ts-mode) nil)
+                        (list "cmake" '(cmake-mode cmake-ts-mode) nil)))
+          (let* ((modes (nth 1 check))
+                 (expected (nth 2 check))
+                 (entry (and modes
+                             (alist-get modes eglot-server-programs nil nil #'equal)))
+                 ;; The layers register the contact with `#'FUNCTION',
+                 ;; which Emacs 30 evaluates to the symbol and earlier
+                 ;; Emacs to the function object; accept both forms.
+                 (good (and entry
+                             (or (null expected)
+                                 (eq entry expected)
+                                 (eq entry (ignore-errors
+                                             (symbol-function expected)))))))
+            (row (if good 'ok 'fail) "eglot" "%s entry %s" (car check)
+                 (if good "installed" "missing or replaced by another entry")))))
+      ;; Environment.
+      (let* ((bin (file-name-as-directory
+                   (expand-file-name "~/.local/bin")))
+             ;; `exec-path-from-shell' keeps the trailing slash of a PATH
+             ;; entry, so compare normalized directory names.
+             (on-path (member bin
+                              (mapcar #'file-name-as-directory exec-path))))
+        (when (file-directory-p bin)
+          (row (if on-path 'ok 'warn)
+               "env" "~/.local/bin %s exec-path"
+               (if on-path "is on" "is NOT on"))))
+      (when (fboundp 'my-cpp-effective-parallel-jobs)
+        (row 'ok "env" "C/C++ build jobs: %d; CARGO_BUILD_JOBS: %s"
+             (my-cpp-effective-parallel-jobs)
+             (or (getenv "CARGO_BUILD_JOBS") "unset")))
+      (row (if (fboundp 'my-comma-leader-def) 'ok 'fail)
+           "keys" "`my-comma-leader-def' %s"
+           (if (fboundp 'my-comma-leader-def)
+               "is defined"
+             "is undefined: the leader keys cannot be bound")))
+    (nreverse rows)))
+
+(defun my-ide-doctor ()
+  "Check this IDE configuration and show the result in *IDE doctor*.
+In a batch session the report goes to standard output instead.  Return the
+number of failures."
+  (interactive)
+  (let* ((rows (my-ide-doctor-report))
+         (failures (seq-count (lambda (row) (eq (car row) 'fail)) rows))
+         (warnings (seq-count (lambda (row) (eq (car row) 'warn)) rows))
+         (text (concat
+                (mapconcat
+                 (lambda (row)
+                   (format "[%-4s] %-13s %s"
+                           (pcase (car row) ('ok "ok") ('warn "warn") (_ "FAIL"))
+                           (nth 1 row) (nth 2 row)))
+                 rows "\n")
+                (format "\n\n%d failure(s), %d warning(s)\n" failures warnings))))
+    (if noninteractive
+        (princ text)
+      (with-current-buffer (get-buffer-create "*IDE doctor*")
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert text))
+        (special-mode)
+        (goto-char (point-min))
+        (pop-to-buffer (current-buffer))))
+    failures))
+
 ;;; Keybindings
 
 ;; The shared operations dispatch on the current buffer's language.
@@ -307,25 +495,36 @@ A second registration for the same MODES replaces the first."
 ;; `my-comma-leader-def' is defined in init-evil.el, and evil finishes
 ;; loading inside it, before the definer exists.
 (with-eval-after-load 'init-evil
-  (my-comma-leader-def
-    "nb" #'my-ide-build
-    ;; ,nc does not dispatch: `compile' is already language-neutral and
-    ;; works in every buffer.  Formerly ,op; `my-compile' was removed
-    ;; upstream (commit e5ab235a).
-    "nc" #'compile
-    "nt" #'my-ide-test
-    "nd" #'my-ide-debug
-    "nl" #'my-ide-lint
-    "nf" #'my-ide-format))
+  ;; Expand at run time: `my-comma-leader-def' is a macro without a
+  ;; function cell, so a file compiled without init-evil loaded would
+  ;; turn a direct call into a broken function call.
+  (eval (macroexpand
+         '(my-comma-leader-def
+           "nb" #'my-ide-build
+           ;; ,nc does not dispatch: `compile' is already language-neutral and
+           ;; works in every buffer.  Formerly ,op; `my-compile' was removed
+           ;; upstream (commit e5ab235a).
+           "nc" #'compile
+           "nt" #'my-ide-test
+           "nd" #'my-ide-debug
+           "nl" #'my-ide-lint
+           "nf" #'my-ide-format))))
 
-;; The LSP keys wait for Eglot since the commands come from it.
+;; The LSP keys wait for Eglot since the commands come from it, and for
+;; init-evil as well: if Eglot is already loaded when this file loads,
+;; the first form runs at once, before `my-comma-leader-def' exists.
 (with-eval-after-load 'eglot
-  (my-comma-leader-def
-    "nr" #'eglot-rename
-    "na" #'eglot-code-actions
-    ;; Find references (M-? also works; this is the comma-leader alias)
-    "ni" #'xref-find-references
-    "ne" #'eglot-reconnect))
+  (with-eval-after-load 'init-evil
+    ;; Expand at run time: `my-comma-leader-def' is a macro without a
+    ;; function cell, so a file compiled without init-evil loaded would
+    ;; turn a direct call into a broken function call.
+    (eval (macroexpand
+           '(my-comma-leader-def
+             "nr" #'eglot-rename
+             "na" #'eglot-code-actions
+             ;; Find references (M-? also works; this is the comma-leader alias)
+             "ni" #'xref-find-references
+             "ne" #'eglot-reconnect)))))
 
 (provide 'init-ide)
 ;;; init-ide.el ends here
