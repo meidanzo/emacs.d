@@ -2,6 +2,8 @@
 ;; Derived from redguardtoo/emacs.d (GPL-3.0-or-later).
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
+;;; Code:
+
 (my-run-with-idle-timer 2 (lambda () (require 'pdf-view)))
 
 ;; {{ grep pdf
