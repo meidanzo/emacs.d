@@ -4,9 +4,11 @@
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Commentary:
 ;; Editing-level setup for C/C++/CMake buffers:
-;;   1. C/C++ (cc-mode)     Google style, 4-space indent, GDB window layout
+;;   1. C/C++ (cc-mode)     Google style, 4-space indent
 ;;   2. C/C++ (tree-sitter) same 4-space indent for c-ts-mode/c++-ts-mode
 ;;   3. CMake                imenu index for both cmake-mode and cmake-ts-mode
+;; GDB window layout (gdb-many-windows, gdb-show-main) lives in
+;; init-CIDE.el's debugging section.
 ;;; Code:
 
 (require 'google-c-style)
