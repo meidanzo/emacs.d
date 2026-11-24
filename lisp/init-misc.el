@@ -160,7 +160,7 @@ FN checks these characters belong to normal word characters."
     rlt))
 
 (with-eval-after-load 'elec-pair
-  (setq electric-pair-inhibit-predicate 'my-electric-pair-inhibit))
+  (setq electric-pair-inhibit-predicate #'my-electric-pair-inhibit))
 ;; }}
 
 ;; {{
@@ -200,17 +200,21 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
 (my-run-with-idle-timer 1 #'fastctags-auto-setup)
 
 ;;; {{ display long lines in truncated style (end line with $)
-(defun my-truncate-lines-setup ()
-  (toggle-truncate-lines 1))
-(add-hook 'grep-mode-hook 'my-truncate-lines-setup)
+(defun my-long-lines-setup ()
+  "Set up long lines."
+  (setq-local truncate-lines t)
+  (setq-local truncate-partial-width-windows t)
+  (setq-local long-line-threshold 200)
+  (setq-local large-hscroll-threshold 300))
+(add-hook 'grep-mode-hook 'my-long-lines-setup)
 ;; }}
 
 ;; turn on auto-fill-mode, don't use `text-mode-hook' because for some
 ;; mode (org-mode for example), this will make the exported document
 ;; ugly!
 ;; (add-hook 'markdown-mode-hook 'turn-on-auto-fill)
-(add-hook 'change-log-mode-hook 'turn-on-auto-fill)
-(add-hook 'cc-mode-hook 'turn-on-auto-fill)
+(add-hook 'change-log-mode-hook #'turn-on-auto-fill)
+(add-hook 'cc-mode-hook #'turn-on-auto-fill)
 
 ;; some project prefer tab, so be it
 ;; @see http://stackoverflow.com/questions/69934/set-4-space-indent-in-emacs-in-text-mode
@@ -291,7 +295,7 @@ In each rule, 1st item is default directory, 2nd item is the shell command.")
     (when (eq major-mode 'compilation-mode)
       (my-ensure 'ansi-color)
       (ansi-color-apply-on-region compilation-filter-start (point-max))))
-  (add-hook 'compilation-filter-hook 'my-colorize-compilation-buffer))
+  (add-hook 'compilation-filter-hook #'my-colorize-compilation-buffer))
 ;; }}
 
 (defun my-minibuffer-setup-hook ()
@@ -362,22 +366,12 @@ So it's at the top of clipboard manager."
 ;; }}
 
 
-;; {{ emmet (auto-complete html tags)
-;; @see https://github.com/rooney/zencoding for original tutorial
-;; @see https://github.com/smihica/emmet for new tutorial
-;; C-j or C-return to expand the line
-(add-hook 'sgml-mode-hook 'emmet-mode) ; `sgml-mode` is parent of `html-mode'
-(add-hook 'web-mode-hook 'emmet-mode)
-(add-hook 'css-mode-hook  'emmet-mode)
-(add-hook 'rjsx-mode-hook  'emmet-mode)
-;; }}
-
 (defun sgml-mode-hook-setup ()
   "Sgml/html mode setup."
   ;; let `web-mode' handle indentation by itself..
   ;; It does not derives from `sgml-mode'.
   (setq-local indent-region-function 'sgml-pretty-print))
-(add-hook 'sgml-mode-hook 'sgml-mode-hook-setup)
+(add-hook 'sgml-mode-hook #'sgml-mode-hook-setup)
 
 
 ;; {{ xterm
@@ -387,7 +381,7 @@ So it's at the top of clipboard manager."
   (unless window-system
     ;; Mouse in a terminal (Use shift to paste with middle button)
     (xterm-mouse-mode 1)))
-(add-hook 'after-make-frame-functions 'my-run-after-make-frame-hook)
+(add-hook 'after-make-frame-functions #'my-run-after-make-frame-hook)
 ;; }}
 
 ;; {{ check attachments
@@ -422,7 +416,7 @@ So it's at the top of clipboard manager."
     (unless
         (y-or-n-p "The message suggests that you may want to attach something, but no attachment is found.  Send anyway?")
       (error "It seems that an attachment is needed, but none was found.  Aborting sending!"))))
-(add-hook 'message-send-hook 'my-message-pre-send-check-attachment)
+(add-hook 'message-send-hook #'my-message-pre-send-check-attachment)
 ;; }}
 
 (defun my-kill-all-but-current-buffer ()
@@ -439,21 +433,21 @@ So it's at the top of clipboard manager."
   (set-syntax-table (let* ((table (make-syntax-table)))
                       (modify-syntax-entry ?/ "." table)
                       table)))
-(add-hook 'minibuffer-inactive-mode-hook 'my-minibuffer-inactive-mode-hook-setup)
+(add-hook 'minibuffer-inactive-mode-hook #'my-minibuffer-inactive-mode-hook-setup)
 
 ;; {{ vc-msg
-(defun vc-msg-hook-setup (vcs-type commit-info)
+(defun my-vc-msg-hook-setup (vcs-type commit-info)
   "Set up vc with VCS-TYPE and COMMIT-INFO."
   ;; copy commit id to clipboard
   (ignore vcs-type)
   (my-pclip (plist-get commit-info :id)))
-(add-hook 'vc-msg-hook 'vc-msg-hook-setup)
+(add-hook 'vc-msg-hook #'my-vc-msg-hook-setup)
 
-(defun vc-msg-show-code-setup ()
+(defun my-vc-msg-show-code-setup ()
   "Use `ffip-diff-mode' instead of `diff-mode'."
   (my-ensure 'find-file-in-project)
   (ffip-diff-mode))
-(add-hook 'vc-msg-show-code-hook 'vc-msg-show-code-setup)
+(add-hook 'vc-msg-show-code-hook #'my-vc-msg-show-code-setup)
 ;; }}
 
 ;; {{
@@ -521,7 +515,7 @@ ARG is ignored."
                                 search-ring
                                 regexp-search-ring))
 (setq session-save-file-coding-system 'utf-8)
-(add-hook 'after-init-hook 'session-initialize)
+(add-hook 'after-init-hook #'session-initialize)
 ;; }}
 
 ;; {{ compile setup
@@ -753,14 +747,13 @@ might be bad."
 ;; {{ use tmr for pomodoro
 (with-eval-after-load 'tmr
   (when my-wsl-p
-    (remove-hook 'tmr-timer-finished-functions
-                 #'tmr-notification-notify))
+    (remove-hook 'tmr-timer-finished-functions #'tmr-notification-notify))
   ;; Show timer in the mode line
   (tmr-mode-line-mode 1))
 ;; }}
 
 ;; {{ epub setup
-(defun nov-mode-hook-setup ()
+(defun my-nov-mode-hook-setup ()
   "Set up of `nov-mode'."
   (local-set-key (kbd "d")
          (lambda ()
@@ -769,9 +762,9 @@ might be bad."
            (forward-word)
            (forward-char -1)
            (my-dict-complete-definition)))
-  (local-set-key (kbd ";") 'my-hydra-ebook/body)
+  (local-set-key (kbd ";") #'my-hydra-ebook/body)
   (local-set-key (kbd "w") #'mybigword-big-words-in-current-window))
-(add-hook 'nov-mode-hook 'nov-mode-hook-setup)
+(add-hook 'nov-mode-hook #'my-nov-mode-hook-setup)
 
 (with-eval-after-load 'nov
   (defun my-nov-content-unique-identifier (orig-fun content)
@@ -919,7 +912,7 @@ might be bad."
 
 
 ;; {{ markdown
-(defun markdown-mode-hook-setup ()
+(defun my-markdown-mode-hook-setup ()
   "Set up markdown."
   ;; makes markdown tables saner via `orgtbl-mode'
   ;; Stolen from http://stackoverflow.com/a/26297700
@@ -930,11 +923,11 @@ might be bad."
     (save-excursion
       (goto-char (point-min))
       (while (search-forward "-+-" nil t) (replace-match "-|-"))))
-  (add-hook 'after-save-hook 'cleanup-org-tables nil 'make-it-local)
+  (add-hook 'after-save-hook #'cleanup-org-tables nil 'make-it-local)
   (orgtbl-mode 1) ; enable key bindings
   ;; don't wrap lines because there is table in `markdown-mode'
   (setq truncate-lines t))
-(add-hook 'markdown-mode-hook 'markdown-mode-hook-setup)
+(add-hook 'markdown-mode-hook #'my-markdown-mode-hook-setup)
 ;; }}
 
 ;; {{ pdf
@@ -1013,12 +1006,12 @@ Org node property PDF_PAGE_OFFSET is used to calculate physical page number."
 (setq wc-idle-wait most-positive-fixnum)
 ;; minor mode sets up hotkey&modeline&timer
 ;; I don't use any of them
-(unless (featurep 'init-modeline) (add-hook 'text-mode-hook 'wc-mode))
+(unless (featurep 'init-modeline) (add-hook 'text-mode-hook #'wc-mode))
 
 (defvar my-lazy-before-save-timer nil "Timer for `before-save-hook'.")
 (defvar  my-lazy-before-save-update-interval 16
   "The interval (seconds) routines happen in `before-save-hook'.")
-(defun lazy-before-save-hook-setup ()
+(defun my-lazy-before-save-hook-setup ()
   "Do something when saving current buffer.
 It's also controlled by `my-lazy-before-save-timer'."
   (when (or (not my-lazy-before-save-timer)
@@ -1031,11 +1024,11 @@ It's also controlled by `my-lazy-before-save-timer'."
       (setq wc-buffer-stats (wc-mode-update))
       (when (featurep 'init-modeline)
         (setq my-extra-mode-line-info wc-buffer-stats)))))
-(add-hook 'before-save-hook 'lazy-before-save-hook-setup)
+(add-hook 'before-save-hook #'my-lazy-before-save-hook-setup)
 ;; }}
 
 (defvar my-gdb-history-file "~/.gdb_history")
-(defun gud-gdb-mode-hook-setup ()
+(defun my-gud-gdb-mode-hook-setup ()
   "GDB setup."
 
   ;; Content of my "~/.gdbinit":
@@ -1046,7 +1039,7 @@ It's also controlled by `my-lazy-before-save-timer'."
              (file-exists-p my-gdb-history-file))
     (setq comint-input-ring-file-name my-gdb-history-file)
     (comint-read-input-ring t)))
-(add-hook 'gud-gdb-mode-hook 'gud-gdb-mode-hook-setup)
+(add-hook 'gud-gdb-mode-hook #'my-gud-gdb-mode-hook-setup)
 
 ;; {{ helpful (https://github.com/Wilfred/helpful)
 ;; Note that the built-in `describe-function' includes both functions
@@ -1252,14 +1245,14 @@ MATCH is optional tag match."
     ;; (turn-on-eldoc-mode)
     ;; show trailing spaces in a programming mod
     (setq show-trailing-whitespace t)))
-(add-hook 'prog-mode-hook 'my-generic-prog-mode-hook-setup)
+(add-hook 'prog-mode-hook #'my-generic-prog-mode-hook-setup)
 
 ;; {{ lua
 (defun my-lua-mode-setup ()
   "Set up lua script."
   ;; extract event handler
   (push '("Handler" "^[ \t]*\\([a-zA-Z_.0-9]+\\):Connect(function" 1) imenu-generic-expression))
-(add-hook 'lua-mode-hook 'my-lua-mode-setup)
+(add-hook 'lua-mode-hook #'my-lua-mode-setup)
 
 (with-eval-after-load 'apheleia
   ;; 1. Define the formatter command
@@ -1433,14 +1426,14 @@ If it's on, disable it and restore single window."
 ;; }}
 
 ;; {{ web
-(defun web-mode-hook-setup ()
+(defun my-web-mode-hook-setup ()
   "Set up `web-mode'."
   (unless (my-buffer-file-temp-p)
     (setq-local wucuo-flyspell-check-doublon nil)
     ;; `web-mode-yasnippet-exit-hook' indents text generated by yasnippet
     ;; I prefer controlling indention manually
     (remove-hook 'yas-after-exit-snippet-hook #'web-mode-yasnippet-exit-hook t)))
-(add-hook 'web-mode-hook 'web-mode-hook-setup)
+(add-hook 'web-mode-hook #'my-web-mode-hook-setup)
 
 (with-eval-after-load 'web-mode
   ;; make org-mode export fail, I use evil and evil-matchit
