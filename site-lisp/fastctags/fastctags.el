@@ -1071,26 +1071,23 @@ CURRENT-FILE is used to compare with candidate path."
       pat))
 
    ;; fallback
-   (t excmd)))
+   (t
+    excmd)))
 
 (defun fastctags-search-regex (tagname)
   "Return regex to match a Vim ctags line containing TAGNAME using rx."
   (rx-to-string
    `(seq line-start
-         ;; Group 1: Tag Name
-         (group ,(or tagname '(one-or-more (regexp "[^\t]"))))
+         (group ,(or tagname '(one-or-more (not (any "\t")))))
          "\t"
-         ;; Group 2: Filename (changed to one-or-more)
-         (group (one-or-more (regexp "[^\t]")))
+         (group (one-or-more (not (any "\t"))))
          "\t"
-         ;; Group 3: Ex-command (the search pattern or line number)
          (group (+? any))
          ";\""
-         ;; Group 4: Kind (made optional and more flexible for trailing fields)
-         (zero-or-more whitespace)
-         (group (regexp "[a-zA-Z]"))
-         ;; Allow for extra fields like line:42 or class:X
-         (zero-or-more any)
+         (zero-or-one
+          "\t"
+          (group (one-or-more (any "a-zA-Z")))
+          (zero-or-more any))
          line-end)))
 
 (defun fastctags-apply-excmd (excmd)
@@ -1130,6 +1127,9 @@ CURRENT-FILE is used to compare with candidate path."
 (defun fastctags-nav-parse-cands (str tagname-re tagname root-dir fuzzy rank)
   "Parse string STR with TAGNAME-RE TAGNAME ROOT-DIR FUZZY RANK.
 Return candidate."
+  (when fastctags-debug
+    (message "fastctags-nav-parse-cands called => %s %s %s %s"
+             str tagname-re tagname rank))
   (when (> (length (string-trim (or str ""))) 0)
     (let* (cands cand)
       (with-temp-buffer
@@ -1396,10 +1396,13 @@ Focus on TAGNAME if it's not nil."
 
 (defun fastctags-nav-format-candidate-default (candidate)
   "Format code navigation CANDIDATE for display."
-  (format "%s:%s:%s"
-          (plist-get candidate :kind)
-          (plist-get candidate :file)
-          (plist-get candidate :text)))
+  (let* ((tagname (plist-get candidate :tagname))
+         (kind (plist-get candidate :kind)))
+    (format "%s [%s] %s: %s"
+            (or tagname "")
+            (or kind "")
+            (plist-get candidate :file)
+            (plist-get candidate :text))))
 
 ;;;###autoload
 (defun fastctags-scan-code (&optional dir)
@@ -1743,6 +1746,16 @@ If FORCED-TAGS-FILE is nil, the updating process might now happen."
       (fastctags-scan-dir (file-name-directory (expand-file-name tags-file)))
       (unless fastctags-quiet-when-updating-tags
         (message "%s is updated!" tags-file)))))
+
+;;;###autoload
+(defun fastctags-tag-line (tag-name file-name line-number &optional kind)
+  "Return one tags-file line using TAG-NAME, FILE-NAME, LINE-NUMBER and KIND."
+  (concat
+   (format "%s\t%s\t%d;\""
+           tag-name
+           file-name
+           line-number)
+   (if kind (format "\t%s" kind) "")))
 
 ;;;###autoload
 (defun fastctags-auto-setup ()
